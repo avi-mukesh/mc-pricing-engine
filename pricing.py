@@ -13,53 +13,44 @@ class MarketParams:
         return self.S0, self.K, self.T, self.rf, self.sigma
     
 class MonteCarloPricer:
-    def __init__(self, params: MarketParams, iterations: int):
+    def __init__(self, params: MarketParams, iterations: int, rng_seed: int):
         self.params = params
-        self.iterations = iterations  
-    
-    # TODO: tidy up the duplicated logic between these two methods    
-    def call_price(self) -> float:
-        S, K, T, rf, sigma = self.params.unpack()
+        self.iterations = iterations
+        self.rng = np.random.default_rng(rng_seed)
+        self.simulate_price_paths()
         
-        z = np.random.normal(0, 1, self.iterations)
-
+    def simulate_price_paths(self):
+        S, K, T, rf, sigma = self.params.unpack()
+        z = self.rng.normal(0, 1, self.iterations)
         # simulate stock price at time T by simulating dS_t = \r_f*S_t*dt + \sigma * S_t * dW_t^Q
         # notice we are using risk neutral measure and using r_f instead of mu now
         # expected growth of asset = risk-free rate - the entire foundation of risk-free pricing
-        stock_price_simulations = S * np.exp((rf - 0.5 * sigma ** 2)*T + sigma * np.sqrt(T) * z)
-        
-        payoffs = np.maximum(stock_price_simulations - K, 0)
-        
+        self.price_simulations = S * np.exp((rf - 0.5 * sigma ** 2)*T + sigma * np.sqrt(T) * z)
+    
+    def price_result(self, payoffs):
         # discount to present time
-        discounted_payoffs = payoffs * np.exp(-rf * T)
-        
+        discounted_payoffs = payoffs * np.exp(-self.params.rf * self.params.T)
         # work out the average payoff amongst all simulations
         price = np.mean(discounted_payoffs)
-
         # standard error measures how wrong is the average likely going to be
         standard_error = np.std(discounted_payoffs) / np.sqrt(self.iterations)
         
         return price, standard_error
     
+    # TODO: tidy up the duplicated logic between these two methods    
+    def call_price(self) -> float:
+        if not self.price_simulations or len(self.price_simulations) == 0:
+            self.simulate_price_paths()
+            
+        payoffs = np.maximum(self.price_simulations - self.params.K, 0)
+        return self.price_result(payoffs)
+    
     def put_price(self):
-        S, K, T, rf, sigma = self.params.unpack()
-        
-        z = np.random.normal(0, 1, self.iterations)
-        
-        stock_price_simulations = S * np.exp((rf - 0.5 * sigma ** 2)*T + sigma * np.sqrt(T) * z)
-
-        payoffs = np.maximum(K - stock_price_simulations, 0)
-        
-        # discount to present time
-        discounted_payoffs = payoffs * np.exp(-rf * T)
-        
-        # work out the average payoff amongst all simulations
-        price = np.mean(discounted_payoffs)
-
-        # standard error measures how wrong is the average likely going to be
-        standard_error = np.std(discounted_payoffs) / np.sqrt(self.iterations)
-        
-        return price, standard_error
+        if not self.price_simulations or len(self.price_simulations) == 0:
+            self.simulate_price_paths()
+            
+        payoffs = np.maximum(self.params.K - self.price_simulations, 0)
+        return self.price_result(payoffs)
     
 def bs_call_price(params: MarketParams):
     S, K, T, rf, sigma = params.unpack()
