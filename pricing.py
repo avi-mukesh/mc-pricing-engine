@@ -13,10 +13,10 @@ class MarketParams:
         return self.S0, self.K, self.T, self.rf, self.sigma
     
 class MonteCarloPricer:
-    def __init__(self, params: MarketParams, iterations: int, rng_seed: int):
+    def __init__(self, params: MarketParams, iterations: int, rng_seed: int | None = None):
         self.params = params
         self.iterations = iterations
-        self.rng = np.random.default_rng(rng_seed)
+        self.rng = np.random.default_rng(rng_seed) if rng_seed is not None else np.random.default_rng()
         self.simulate_price_paths()
         
     def simulate_price_paths(self):
@@ -39,14 +39,14 @@ class MonteCarloPricer:
     
     # TODO: tidy up the duplicated logic between these two methods    
     def call_price(self) -> float:
-        if not self.price_simulations or len(self.price_simulations) == 0:
+        if self.price_simulations is None or len(self.price_simulations) == 0:
             self.simulate_price_paths()
             
         payoffs = np.maximum(self.price_simulations - self.params.K, 0)
         return self.price_result(payoffs)
     
     def put_price(self):
-        if not self.price_simulations or len(self.price_simulations) == 0:
+        if self.price_simulations is None or len(self.price_simulations) == 0:
             self.simulate_price_paths()
             
         payoffs = np.maximum(self.params.K - self.price_simulations, 0)
