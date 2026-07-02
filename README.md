@@ -23,6 +23,9 @@ Monte Carlo estimates this by averaging over draws of the standard normal $Z~\si
 
 Black-Scholes calculates the same expectation, but analytically, so gives an exact value for us to validate MC against.
 
+### Asian Options
+
+Phase 2 of this project I plan to support Asian options. These are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $(\frac{S(1)+S(2)}{2}-K, 0)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly, which is why MC is useful.
 
 ## Validation
 
