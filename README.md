@@ -7,17 +7,19 @@ Currently, terminal prices are simulated with Monte Carlo, and the price of Euro
 In future versions, I plan to support exotics, and also migrate to AWS.
 
 ## The maths
-Under risk-neutral measure, modelling the stock as following GBM $dS_t=r_fS_tdt+\sigma dW_t$.
+Under risk-neutral measure, we model the stock as GBM $dS_t=r_fS_tdt+\sigma S_t dW_t$.
 
-Where $W_t$ is a [Weiner Process](https://sites.me.ucsb.edu/~moehlis/APC591/tutorials/tutorial7/node2.html).
+Where $W_t$ is a [Wiener Process](https://sites.me.ucsb.edu/~moehlis/APC591/tutorials/tutorial7/node2.html).
 
 Applying [Itô's Lemma](https://math.nyu.edu/~goodman/teaching/StochCalc2018/notes/Lesson4.pdf) to $\ln S_t$ gives
+
+$d(\ln S_t) = (r_f-\frac{1}{2}\sigma^2)d_t+\sigma dW_t$. Integrating this gives
 
 $S_T=S_0\exp[(r_f-\frac{1}{2}\sigma^2)T+\sigma W_T]$
 
 The arbitrage-free price is the discounted risk-neutral expectation: $C = e^{-r_fT}\mathbb{E}[(S_T-K)^+]$.
 
-Monte Carlo estimates this by averaging over draws of the standard normal $Z~\sim N(0,1)$ since $W\sim N(0,T)=\sqrt{T}Z$.
+Monte Carlo estimates this by averaging over draws of the standard normal $Z~\sim N(0,1)$ since $W_T\sim N(0,T)$ and $Z\sim N(0,1)$ so $W_T=\sqrt{T}Z$
 
 Black-Scholes calculates the same expectation, but analytically, so gives an exact value for us to validate MC against.
 
