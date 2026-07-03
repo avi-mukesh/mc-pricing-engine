@@ -9,7 +9,7 @@ sigma = 0.2
 params = MarketParams(S0, K, T, rf, sigma)
 
 mc_pricer = MonteCarloPricer(params, 10000000)
-mc_pricer.simulate_price_paths()
+mc_pricer.simulate_terminal_prices()
 
 mc_call, std_error = mc_pricer.call_price()
 bs_call = bs_call_price(params)
@@ -23,6 +23,9 @@ assert(abs(mc_put - bs_put) < 2 * std_error)
 assert(abs(bs_call - bs_put - S0 + K * np.exp(-rf * T)) == 0)
 
 # put-call parity holds for MC (not exact, but good)
-discounted_price_simulations = np.exp(-rf * T) * mc_pricer.price_simulations
-std_error_pc_parity = np.std(discounted_price_simulations) / np.sqrt(mc_pricer.iterations)
+discounted_terminal_prices = np.exp(-rf * T) * mc_pricer.terminal_prices
+std_error_pc_parity = np.std(discounted_terminal_prices) / np.sqrt(mc_pricer.iterations)
 assert(abs(mc_call - mc_put - S0 + K * np.exp(-rf * T)) < 2 * std_error_pc_parity)
+
+
+# mc_pricer.simulate_price_paths(1)

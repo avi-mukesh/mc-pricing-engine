@@ -6,6 +6,12 @@ Currently, terminal prices are simulated with Monte Carlo, and the price of Euro
 
 In future versions, I plan to support exotics, and also migrate to AWS.
 
+## Parameters
+
+`iterations` is the number of paths to simulate e.g. `iterations=100000`
+
+`n` is the number of steps to break each path into e.g. `n=252`
+
 ## The maths
 Under risk-neutral measure, we model the stock as GBM $dS_t=r_fS_tdt+\sigma S_t dW_t$.
 
@@ -25,7 +31,7 @@ Black-Scholes calculates the same expectation, but analytically, so gives an exa
 
 ### Asian Options
 
-Phase 2 of this project I plan to support Asian options. These are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $(\frac{S(1)+S(2)}{2}-K, 0)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly, which is why MC is useful.
+Phase 2 of this project I plan to support Asian options. These are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $(\frac{S(1)+S(2)}{2}-K, 0)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly ($2^n$ nodes at level $n$ instead of $n+1$ now), which is where MC will prove useful.
 
 ## Validation
 
