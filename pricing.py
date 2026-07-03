@@ -17,12 +17,16 @@ class MonteCarloPricer:
         self.rf = params.rf
         self.sigma = params.sigma
         self.iterations = iterations
-        self.terminal_prices = []
-        self.price_simulations = []
+        self.terminal_prices = None
+        self.price_simulations = None
         
         self.rng = np.random.default_rng(rng_seed) if rng_seed is not None else np.random.default_rng()
         
-    def simulate_terminal_prices(self, n: int = 252):
+    def simulate_price_paths(self, n: int = 252):
+        if self.price_simulations is not None:
+            return
+        
+        self.price_simulations = []
         dt = self.T/n
         for _ in range(self.iterations):
             simulation = [self.S0]
@@ -33,11 +37,14 @@ class MonteCarloPricer:
                 simulation.append(S_t)
             self.price_simulations.append(simulation)
 
-    def simulate_price_paths(self):
-        z = self.rng.normal(0, 1, self.iterations)
+    def simulate_terminal_prices(self):
         # simulate stock price at time T by simulating dS_t = \r_f*S_t*dt + \sigma * S_t * dW_t^Q
         # notice we are using risk neutral measure and using r_f instead of mu now
         # expected growth of asset = risk-free rate - the entire foundation of risk-free pricing
+        if self.terminal_prices is not None:
+            return
+        
+        z = self.rng.normal(0, 1, self.iterations)
         self.terminal_prices = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * z)
     
     def price_result(self, payoffs):

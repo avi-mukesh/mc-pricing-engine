@@ -28,4 +28,4 @@ std_error_pc_parity = np.std(discounted_terminal_prices) / np.sqrt(mc_pricer.ite
 assert(abs(mc_call - mc_put - S0 + K * np.exp(-rf * T)) < 2 * std_error_pc_parity)
 
 
-# mc_pricer.simulate_price_paths(1)
+mc_pricer.simulate_price_paths(1)
