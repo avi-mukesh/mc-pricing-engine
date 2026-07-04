@@ -43,6 +43,6 @@ mc_call_2 = np.mean(mc_call_prices)
 std_error = np.std(mc_call_prices) / np.sqrt(iterations)
 
 print('mc call price (full path simulation) {:.3f}'.format(mc_call_2))
-print('bs call price {:.3f}'.format(bs_put))
+print('bs call price {:.3f}'.format(bs_call))
 print('standard error {:.4f}'.format(std_error))
 assert(abs(mc_call_2 - bs_call) < 2 * std_error)
