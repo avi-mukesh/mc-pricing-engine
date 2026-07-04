@@ -58,6 +58,7 @@ class MonteCarloPricer:
         payoffs = np.maximum(self.K - self.terminal_prices, 0)
         return self.price_result(payoffs)
     
+    # TODO: deduplicate some of the logic in these two methods
     def call_price_from_paths(self):
         terminal = np.array(self.price_simulations)[:, -1]
         mc_call_prices = np.exp(-self.rf*self.T)*np.maximum(terminal - self.K, 0)
@@ -72,6 +73,18 @@ class MonteCarloPricer:
         std_error = np.std(mc_put_prices) / np.sqrt(self.iterations)
         return price, std_error
     
+    # payoff of an asian call is max(avg price from history - K, 0)
+    # so we don't just care about terminal price like a european, we care about all prices up to it
+    def asian_call_price(self):
+        avg_price_by_path = self.price_simulations.mean(axis=1)
+        asian_payoffs = np.maximum(avg_price_by_path - self.K, 0)
+        return self.price_result(asian_payoffs)
+    
+    def asian_put_price(self):
+        avg_price_by_path = self.price_simulations.mean(axis=1)
+        asian_payoffs = np.maximum(self.K - avg_price_by_path, 0)
+        return self.price_result(asian_payoffs)
+
 def bs_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
     d2 = d1 - params.sigma * np.sqrt(params.T)
