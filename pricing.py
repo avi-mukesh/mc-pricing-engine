@@ -26,16 +26,9 @@ class MonteCarloPricer:
         if self.price_simulations is not None:
             return
         
-        self.price_simulations = []
         dt = self.T/n
-        for _ in range(self.iterations):
-            simulation = [self.S0]
-            S_t = self.S0
-            for i in range(n):
-                z = self.rng.normal()
-                S_t = S_t * np.exp((self.rf - 0.5 * self.sigma ** 2)*dt + self.sigma * np.sqrt(dt) * z)
-                simulation.append(S_t)
-            self.price_simulations.append(simulation)
+        z = self.rng.normal(0, 1, (self.iterations, n))
+        self.price_simulations = self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*z, axis=1))
 
     def simulate_terminal_prices(self):
         # simulate stock price at time T by simulating dS_t = \r_f*S_t*dt + \sigma * S_t * dW_t^Q
