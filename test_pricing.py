@@ -36,11 +36,7 @@ assert(abs(mc_call - mc_put - S0 + K * np.exp(-rf * T)) < 2 * std_error_pc_parit
 
 # ensuring that the method that simulated the full price paths (instead of just the terminal prices) is valid
 mc_pricer.simulate_price_paths(252)
-price_paths = mc_pricer.price_simulations
-terminal = np.array(price_paths)[:, -1]
-mc_call_prices = np.exp(-rf*T)*np.maximum(terminal - K, 0)
-mc_call_2 = np.mean(mc_call_prices)
-std_error = np.std(mc_call_prices) / np.sqrt(iterations)
+mc_call_2, std_error = mc_pricer.call_price_from_paths()
 
 print('mc call price (full path simulation) {:.3f}'.format(mc_call_2))
 print('bs call price {:.3f}'.format(bs_call))

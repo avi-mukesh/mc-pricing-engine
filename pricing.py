@@ -58,6 +58,20 @@ class MonteCarloPricer:
         payoffs = np.maximum(self.K - self.terminal_prices, 0)
         return self.price_result(payoffs)
     
+    def call_price_from_paths(self):
+        terminal = np.array(self.price_simulations)[:, -1]
+        mc_call_prices = np.exp(-self.rf*self.T)*np.maximum(terminal - self.K, 0)
+        price = np.mean(mc_call_prices)
+        std_error = np.std(mc_call_prices) / np.sqrt(self.iterations)
+        return price, std_error
+    
+    def put_price_from_paths(self):
+        terminal = np.array(self.price_simulations)[:, -1]
+        mc_put_prices = np.exp(-self.rf*self.T)*np.maximum(self.K - terminal, 0)
+        price = np.mean(mc_put_prices)
+        std_error = np.std(mc_put_prices) / np.sqrt(self.iterations)
+        return price, std_error
+    
 def bs_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
     d2 = d1 - params.sigma * np.sqrt(params.T)
