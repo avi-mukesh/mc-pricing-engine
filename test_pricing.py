@@ -44,10 +44,16 @@ print('standard error {:.4f}\n'.format(std_error))
 assert(abs(mc_call_2 - bs_call) < 2 * std_error)
 
 
-# asian call option price
+# attempting to validate asian call option price from MC against 2-step binomial model
+# but it doesn't work because n=2 is too small for the tree itself to be accurate
 mc_asian_call, std_error = mc_pricer.asian_call_price()
+bin_asian_call = asian_call_price(params)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
-# print('binomial model (n=2) asian call price {:.3f}'.format(bs_call))
+print('binomial model (n=2) asian call price {:.3f}'.format(bin_asian_call))
 print('standard error {:.4f}\n'.format(std_error))
 
-# TODO: need to validate asian call from MC against binomial model, need to figure out how to translate sigma into U/D moves
+
+# confirming that 2-step binomial isn't accurate, by calculating european call price
+# which we already validated above
+mc_call_binomial = call_price_binomial(params)
+print('binomial model (n=2) european call price {:.3f}'.format(mc_call_binomial))

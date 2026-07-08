@@ -25,7 +25,22 @@ Black-Scholes calculates the same expectation, but analytically, so gives an exa
 
 ### Asian Options
 
-Phase 2 of this project I plan to support Asian options. These are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $(\frac{S(1)+S(2)}{2}-K, 0)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly ($2^n$ nodes at level $n$ instead of $n+1$ now), which is where MC will prove useful.
+Asian options are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $(\frac{S(1)+\dots+S(N)}{N}-K)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly ($2^n$ distinct paths to track at level $n$ instead of $n+1$ now), which is where MC will prove useful.
+
+For validating the Asian option pricer, I use the two-step binomial model in the case we only have $N=2$ timesteps. The binomial model takes $u$, $d$ as inputs (two possible simple returns e.g. 3% and -5%), rather than $\sigma$.
+
+To make the translation, let $M$ be a two-point random variable, representing the log return, taking values $\ln(1+u)$ and $\ln(1+d)$ with probabilities $p$ and $1-p$ respectively. The log return over one step in GBM is $$\ln(\frac{S_{t+dt}}{S_t}) = (r-\frac{1}{2}\sigma^2)dt+\sigma\sqrt{dt}z$$
+
+which is $N((r-\frac{1}{2}\sigma^2)dt, \sigma^2dt)$. So equate $Var(M) = \sigma^2dt$ and simplify to get $$p(1-p)(\ln(1+u)-\ln(1+d))^2=\sigma^2dt$$
+
+Also set up an equation relating the mean. We equate the expected growth factor from one step of the binomial model to the expected growth factor over $dt$ in GBM. Expected growth factor from one step of the binomial model is $$p(1+u)+(1-p)(1+d)$$ and expected growth factor over $dt$ in GBM is $\mathbb{E}[\frac{S_{t+dt}}{S_t}]=\mathbb{E}[\exp((r-\frac{1}{2}\sigma^2)dt+\sigma\sqrt{dt}z)]$ which can be calculated (noting that it is the [M.G.F](https://www.le.ac.uk/users/dsgp1/COURSES/MATHSTAT/6normgf.pdf) of a Normal distribution evaluated at $t=1$) to give $$\exp((r-\frac{1}{2}\sigma^2)dt+\frac{1}{2}\sigma^2dt) = e^{rdt}$$ Equating the two expected growth factors gives $$p(1+u)+(1-p)(1+d)=e^{rdt}$$ So far we only have 2 equations but 3 unknowns ($u, d, p$) so we need to impose a third condition. We can choose this freely because it won't matter for convergence in the limit, so let's constrain $$(1+u)(1+d)=1 \implies \ln(1+u)=-\ln(1+d)$$ as this recombines the tree symmetrically. Substitute this into first equation to get $$4p(1-p)(\ln(1+u))^2=\sigma^2dt$$
+
+CRR defines $\ln(1+u)=\sigma\sqrt{dt}$ so $u=e^{\sigma\sqrt{dt}}-1$, and $d=e^{-\sigma\sqrt{dt}}-1$. This means the variance equation is no longer solved exactly. The mean equation forces $p=\frac{1}{2}+O(\sqrt{dt})$ so $4p(1-p)=1-O(dt)$ and the variance is matched only up to an $O(dt^2)$ error per step. Over $N=T/dt$ steps these errors total $O(dt)$, which vanishes in the limit.
+
+With $(u,d,p)$ calibrated to $\sigma$, both models share the same per-step mean and variance. But they do **not** sample the same distribution: MC draws the exact lognormal step, whereas the tree replaces it with a two-point approximation. So at $n=2$ the tree also carries discretation error and is not an exact anchor.
+
+I confirmed this directly by pricing a vanilla European on the same 2-step tree to get $\approx 9.5$ against a Black–Scholes value of $10.451$, which is a significant gap on an option that has already been validated. The tree is therefore a *convergent* check only. As its step count increases (averaging still at the two monitoring dates), its Asian price should converge to the MC value. For an exact anchor I instead use the geometric-average Asian, whose closed form is derived below.
+
 
 ## Parameters
 

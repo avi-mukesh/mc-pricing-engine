@@ -94,3 +94,57 @@ def bs_put_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
     d2 = d1 - params.sigma * np.sqrt(params.T)
     return -params.S0*stats.norm.cdf(-d1) + params.K*np.exp(-params.rf*(params.T))*stats.norm.cdf(-d2)
+
+def asian_call_price(params: MarketParams):
+    dt = params.T/2
+    
+    u = np.exp(params.sigma*np.sqrt(dt)) - 1
+    d = np.exp(-params.sigma*np.sqrt(dt)) - 1
+    
+    r = np.exp(params.rf*dt) - 1
+    
+    p_star = (r - d)/(u - d)
+    
+    S_u = params.S0 * (1+u)
+    S_d = params.S0 * (1+d)
+    
+    S_uu = S_u * (1+u)
+    S_ud = S_u * (1+d)
+    S_dd = S_d * (1+d)
+    
+    C_uu = max((S_uu + S_u)/2 - params.K, 0)
+    C_ud = max((S_ud + S_u)/2 - params.K, 0)
+    C_du = max((S_ud + S_d)/2 - params.K, 0)
+    C_dd = max((S_dd + S_d)/2 - params.K, 0)
+    
+    C_u = ((1+r)**(-1))*(p_star*C_uu + (1-p_star)*C_ud)
+    C_d = ((1+r)**(-1))*(p_star*C_du + (1-p_star)*C_dd)
+    
+    return ((1+r)**(-1))*(p_star*C_u + (1-p_star)*C_d)
+
+def call_price_binomial(params: MarketParams):
+    dt = params.T/2
+    
+    u = np.exp(params.sigma*np.sqrt(dt)) - 1
+    d = np.exp(-params.sigma*np.sqrt(dt)) - 1
+    
+    r = np.exp(params.rf*dt) - 1
+    
+    p_star = (r - d)/(u - d)
+    
+    S_u = params.S0 * (1+u)
+    S_d = params.S0 * (1+d)
+    
+    S_uu = S_u * (1+u)
+    S_ud = S_u * (1+d)
+    S_dd = S_d * (1+d)
+    
+    C_uu = max(S_uu - params.K, 0)
+    C_ud = max(S_ud - params.K, 0)
+    C_du = C_ud
+    C_dd = max(S_dd - params.K, 0)
+    
+    C_u = ((1+r)**(-1))*(p_star*C_uu + (1-p_star)*C_ud)
+    C_d = ((1+r)**(-1))*(p_star*C_du + (1-p_star)*C_dd)
+    
+    return ((1+r)**(-1))*(p_star*C_u + (1-p_star)*C_d)
