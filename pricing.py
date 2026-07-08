@@ -50,23 +50,23 @@ class MonteCarloPricer:
         
         return price, standard_error
     
-    def call_price(self) -> float:            
+    def european_call_price(self) -> float:
         payoffs = np.maximum(self.terminal_prices - self.K, 0)
         return self.price_result(payoffs)
-    
-    def put_price(self):
+
+    def european_put_price(self):
         payoffs = np.maximum(self.K - self.terminal_prices, 0)
         return self.price_result(payoffs)
-    
+
     # TODO: deduplicate some of the logic in these two methods
-    def call_price_from_paths(self):
+    def european_call_price_from_paths(self):
         terminal = np.array(self.price_simulations)[:, -1]
         mc_call_prices = np.exp(-self.rf*self.T)*np.maximum(terminal - self.K, 0)
         price = np.mean(mc_call_prices)
         std_error = np.std(mc_call_prices) / np.sqrt(self.iterations)
         return price, std_error
-    
-    def put_price_from_paths(self):
+
+    def european_put_price_from_paths(self):
         terminal = np.array(self.price_simulations)[:, -1]
         mc_put_prices = np.exp(-self.rf*self.T)*np.maximum(self.K - terminal, 0)
         price = np.mean(mc_put_prices)
@@ -85,17 +85,17 @@ class MonteCarloPricer:
         asian_payoffs = np.maximum(self.K - avg_price_by_path, 0)
         return self.price_result(asian_payoffs)
 
-def bs_call_price(params: MarketParams):
+def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
     d2 = d1 - params.sigma * np.sqrt(params.T)
     return params.S0*stats.norm.cdf(d1) - params.K*np.exp(-params.rf*(params.T))*stats.norm.cdf(d2)
 
-def bs_put_price(params: MarketParams):
+def bs_european_put_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
     d2 = d1 - params.sigma * np.sqrt(params.T)
     return -params.S0*stats.norm.cdf(-d1) + params.K*np.exp(-params.rf*(params.T))*stats.norm.cdf(-d2)
 
-def asian_call_price(params: MarketParams):
+def binomial_asian_call_price(params: MarketParams):
     dt = params.T/2
     
     u = np.exp(params.sigma*np.sqrt(dt)) - 1
@@ -122,7 +122,7 @@ def asian_call_price(params: MarketParams):
     
     return ((1+r)**(-1))*(p_star*C_u + (1-p_star)*C_d)
 
-def call_price_binomial(params: MarketParams):
+def binomial_european_call_price(params: MarketParams):
     dt = params.T/2
     
     u = np.exp(params.sigma*np.sqrt(dt)) - 1
