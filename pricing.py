@@ -75,15 +75,18 @@ class MonteCarloPricer:
     
     # payoff of an asian call is max(avg price from history - K, 0)
     # so we don't just care about terminal price like a european, we care about all prices up to it
-    def asian_call_price(self):
+    def arithmetic_asian_call_price(self):
         avg_price_by_path = self.price_simulations.mean(axis=1)
         asian_payoffs = np.maximum(avg_price_by_path - self.K, 0)
         return self.price_result(asian_payoffs)
     
-    def asian_put_price(self):
+    def arithmetic_asian_put_price(self):
         avg_price_by_path = self.price_simulations.mean(axis=1)
         asian_payoffs = np.maximum(self.K - avg_price_by_path, 0)
         return self.price_result(asian_payoffs)
+    
+    def bs_geometric_asian_call_price(self):
+        raise('Not implemented')
 
 def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
@@ -95,7 +98,7 @@ def bs_european_put_price(params: MarketParams):
     d2 = d1 - params.sigma * np.sqrt(params.T)
     return -params.S0*stats.norm.cdf(-d1) + params.K*np.exp(-params.rf*(params.T))*stats.norm.cdf(-d2)
 
-def binomial_asian_call_price(params: MarketParams):
+def binomial_arithmetic_asian_call_price(params: MarketParams):
     dt = params.T/2
     
     u = np.exp(params.sigma*np.sqrt(dt)) - 1
@@ -148,3 +151,6 @@ def binomial_european_call_price(params: MarketParams):
     C_d = ((1+r)**(-1))*(p_star*C_du + (1-p_star)*C_dd)
     
     return ((1+r)**(-1))*(p_star*C_u + (1-p_star)*C_d)
+
+def bs_geometric_asian_call_price(params: MarketParams, n: int):
+    raise('Not Implemented')

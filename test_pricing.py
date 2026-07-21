@@ -52,8 +52,8 @@ assert(abs(mc_european_call_from_paths - bs_european_call) < 2 * std_error)
 print('=====testing asian call price: MC vs 2-step binomial model=====')
 # attempting to validate asian call option price from MC against 2-step binomial model
 # but it doesn't work because n=2 is too small for the tree itself to be accurate
-mc_asian_call, std_error = mc_pricer.asian_call_price()
-binomial_asian_call = binomial_asian_call_price(params)
+mc_asian_call, std_error = mc_pricer.arithmetic_asian_call_price()
+binomial_asian_call = binomial_arithmetic_asian_call_price(params)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
 print('binomial model (n=2) asian call price {:.3f}'.format(binomial_asian_call))
 print('standard error {:.4f}\n'.format(std_error))
@@ -65,3 +65,6 @@ print('=====testing 2-step binomial model accuracy: european call price=====')
 binomial_european_call = binomial_european_call_price(params)
 print('binomial model (n=2) european call price {:.3f}'.format(binomial_european_call))
 print('bs european call price {:.3f}'.format(bs_european_call))
+
+
+# TODO: geometric asian and validation
