@@ -85,8 +85,10 @@ class MonteCarloPricer:
         asian_payoffs = np.maximum(self.K - avg_price_by_path, 0)
         return self.price_result(asian_payoffs)
     
-    def bs_geometric_asian_call_price(self):
-        raise('Not implemented')
+    def geometric_asian_call_price(self):
+        geometric_avg_price_by_path = np.sqrt(self.price_simulations[:,0]*self.price_simulations[:,1])
+        asian_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
+        return self.price_result(asian_payoffs)
 
 def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
@@ -152,5 +154,17 @@ def binomial_european_call_price(params: MarketParams):
     
     return ((1+r)**(-1))*(p_star*C_u + (1-p_star)*C_d)
 
-def bs_geometric_asian_call_price(params: MarketParams, n: int):
-    raise('Not Implemented')
+def bs_geometric_asian_call_price(params: MarketParams):
+    dt = params.T/2
+    m = (params.rf - 0.5*params.sigma**2)*dt
+    s = params.sigma * np.sqrt(dt)
+    
+    mu_G = np.log(params.S0) + 1.5*m
+    sigma_G = np.sqrt(1.25)*s
+    
+    d_2 = (mu_G - np.log(params.K))/sigma_G
+    d_1 = d_2 + sigma_G
+    
+    E_G = np.exp(mu_G+0.5*sigma_G**2)
+
+    return np.exp(-params.rf * params.T) * (E_G*stats.norm.cdf(d_1) - params.K*stats.norm.cdf(d_2))

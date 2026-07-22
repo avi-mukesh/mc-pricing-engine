@@ -58,9 +58,13 @@ And $\sigma_G^2 = Var[\ln(G)]=s^2+(\frac{1}{2}s)^2=\frac{5}{4}s^2$
 
 After a bit of algebra (like calculating M.G.F at t=1) we get $\mathbb{E}[G]=\mathbb{E}[e^{\ln(G)}] = \dots = S_0e^{(\frac{3}{2}r-\frac{1}{8}\sigma^2)dt}$
 
-Notice the drift here is $\frac{3}{2}rdt$, not $rdt$.
+Notice the drift here is $\frac{3}{2}rdt$, not $rdt$. $G$ is not a tradeable asset, so no-arbitrage does not force it to grow at the risk-free rate. It's drift is simply what the averaging produces. This is why we cannot use BS with an effective volatility, and must instead evaluate
 
-Now for the price, we need to work out $\mathbb{E}[e^{-rT}(G-K)^+]$
+$$\mathbb{E}[e^{-rT}(G-K)^+]$$
+
+directly, with $G$'s actual mean and variance both plugged in.
+
+To evaluate this
 
 $\mathbb{E}[(G-K)^+] = \int_{\ln(K)}^\infty (e^x-K)\phi(x; \mu_G, \sigma_G^2)dx = \int_{\ln(K)}^\infty e^x\phi(x; \mu_G, \sigma_G^2)dx - K\int_{\ln(K)}^\infty \phi(x; \mu_G, \sigma_G^2)dx$
 
@@ -70,7 +74,7 @@ Standardise $Z=\frac{X-\mu_G}{\sigma_G}\sim N(0,1)$ so $P[X>\ln(K)] = P[Z>\frac{
 
 Define $d_2 = \frac{\mu_G - \ln(K)}{\sigma_G}$ so second term is $KN(d_2)$
 
-**First term**: $e^x\phi(x;\mu_G, \sigma_G^2) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{x-\frac{1}{2}(\frac{x-\mu_G}{\sigma_G})^2}$
+**First term**: $e^x\phi(x;\mu_G, \sigma_G^2) = \frac{1}{\sqrt{2\pi\sigma_G^2}} e^{x-\frac{1}{2}(\frac{x-\mu_G}{\sigma_G})^2}$
 
 In the exponent, expanding and then completing the square gives $-\frac{(x-(\mu_G+\sigma_G^2))^2}{2\sigma_G^2}+\frac{1}{2}\sigma_G^2+\mu_G$
 
@@ -80,11 +84,11 @@ Also notice that $e^{\mu_G+\frac{1}{2}\sigma_G^2}=\mathbb{E}[G]$
 
 So $\int_{\ln(K)}^\infty e^x\phi(x; \mu_G, \sigma_G^2)dx = \int_{\ln(K)}^\infty \mathbb{E}[G]\phi(x; \mu_G+\sigma_G^2, \sigma_G^2)dx = \mathbb{E}[G]P[X'>\ln(K)]$ where $X'\sim N(\mu_G+\sigma_G^2, \sigma_G^2)$
 
-This becomes $P[Z>\frac{\ln(K)-(\mu_G+\sigma_G^2)}{\sigma_G}] = 1 - N(\frac{\ln(K)-(\mu_G+\sigma_G^2)}{\sigma_G}) = N(\frac{(\mu_G+\sigma_G^2)-\ln(K)}{\sigma_G})$
+Standardising $X'$ as before, this probability becomes $P[Z>\frac{\ln(K)-(\mu_G+\sigma_G^2)}{\sigma_G}] = 1 - N(\frac{\ln(K)-(\mu_G+\sigma_G^2)}{\sigma_G}) = N(\frac{(\mu_G+\sigma_G^2)-\ln(K)}{\sigma_G})$
 
-Define $d_1 = \frac{(\mu_G+\sigma_G^2)-\ln(K)}{\sigma_G}$, which conveniently equals $d_2+\sigma_G$ so first term is $\mathbb{E}[G]N(d_1)-KN(d_2)$
+Define $d_1 = \frac{(\mu_G+\sigma_G^2)-\ln(K)}{\sigma_G}$, which conveniently equals $d_2+\sigma_G$ so first term is $\mathbb{E}[G]N(d_1)$
 
-Overall, we finally have the price formula
+Overall, for $n=2$ we finally have the price formula
 
 $e^{-rT}(\mathbb{E}[G]N(d_1)-KN(d_2))$
 

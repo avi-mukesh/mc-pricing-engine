@@ -64,7 +64,13 @@ print('=====testing 2-step binomial model accuracy: european call price=====')
 # which we already validated above
 binomial_european_call = binomial_european_call_price(params)
 print('binomial model (n=2) european call price {:.3f}'.format(binomial_european_call))
-print('bs european call price {:.3f}'.format(bs_european_call))
+print('bs european call price {:.3f}\n'.format(bs_european_call))
 
 
-# TODO: geometric asian and validation
+print('=====testing geometric asian call price=====')
+mc_geometric_asian_call, std_error = mc_pricer.geometric_asian_call_price()
+bs_geometric_asian_call = bs_geometric_asian_call_price(params)
+print('mc (n=2) geometric asian call price {:.3f}'.format(mc_geometric_asian_call))
+print('bs geometric asian call price {:.3f}'.format(bs_geometric_asian_call))
+print('standard error {:.4f}\n'.format(std_error))
+assert(abs(mc_geometric_asian_call - bs_geometric_asian_call) < 2 * std_error)
