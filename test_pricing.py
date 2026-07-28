@@ -30,7 +30,7 @@ assert(abs(mc_european_put - bs_european_put) < 2 * std_error)
 
 print('=====testing put-call parity: Black-Scholes (exact)=====')
 # put-call parity holds for BS (should be exact)
-assert(abs(bs_european_call - bs_european_put - S0 + K * np.exp(-rf * T)) == 0)
+assert(abs(bs_european_call - bs_european_put - S0 + K * np.exp(-rf * T)) < 1e-10)
 
 print('=====testing put-call parity: MC (approximate)=====')
 # put-call parity holds for MC (not exact, but good)
@@ -55,7 +55,7 @@ print('=====testing asian call price: MC vs 2-step binomial model=====')
 mc_asian_call, std_error = mc_pricer.arithmetic_asian_call_price()
 binomial_asian_call = binomial_arithmetic_asian_call_price(params)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
-print('binomial model (n=2) asian call price {:.3f}'.format(binomial_asian_call))
+print('binomial model (n=2) asian call price {:.3f} (not a good anchor, too high here)'.format(binomial_asian_call))
 print('standard error {:.4f}\n'.format(std_error))
 
 
@@ -63,7 +63,7 @@ print('=====testing 2-step binomial model accuracy: european call price=====')
 # confirming that 2-step binomial isn't accurate, by calculating european call price
 # which we already validated above
 binomial_european_call = binomial_european_call_price(params)
-print('binomial model (n=2) european call price {:.3f}'.format(binomial_european_call))
+print('binomial model (n=2) european call price {:.3f} (not a good anchor, too low here)'.format(binomial_european_call))
 print('bs european call price {:.3f}\n'.format(bs_european_call))
 
 

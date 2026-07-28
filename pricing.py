@@ -58,16 +58,15 @@ class MonteCarloPricer:
         payoffs = np.maximum(self.K - self.terminal_prices, 0)
         return self.price_result(payoffs)
 
-    # TODO: deduplicate some of the logic in these two methods
     def european_call_price_from_paths(self):
-        terminal = np.array(self.price_simulations)[:, -1]
+        terminal = self.price_simulations[:, -1]
         mc_call_prices = np.exp(-self.rf*self.T)*np.maximum(terminal - self.K, 0)
         price = np.mean(mc_call_prices)
         std_error = np.std(mc_call_prices) / np.sqrt(self.iterations)
         return price, std_error
 
     def european_put_price_from_paths(self):
-        terminal = np.array(self.price_simulations)[:, -1]
+        terminal = self.price_simulations[:, -1]
         mc_put_prices = np.exp(-self.rf*self.T)*np.maximum(self.K - terminal, 0)
         price = np.mean(mc_put_prices)
         std_error = np.std(mc_put_prices) / np.sqrt(self.iterations)
