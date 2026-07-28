@@ -138,6 +138,12 @@ Overall, for $n=2$ we finally have the price formula
 
 $$e^{-rT}(\mathbb{E}[G]N(d_1)-KN(d_2))$$
 
+### Control Variate
+
+A control variate needs two properties: its expectation must be known exactly, and it must be strongly correlated with the target. We know the price of the geometric option exactly (derived above) and since both the arithmetic Asian and geometric Asian use the same price path, their prices are correlated. This lets us build a lower variance estimator for the arithmetic Asian.
+
+If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $Var(Z) = Var(X)-2\beta Cov(X,Y)+\beta^2Var(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{Var(Y)}$, which gives $Var(Z) = Var(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.164, whereas the price using the control variate gives 8.111. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
+
 
 ## Parameters
 

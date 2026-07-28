@@ -77,8 +77,8 @@ class MonteCarloPricer:
     # so we don't just care about terminal price like a european, we care about all prices up to it
     def arithmetic_asian_call_price(self):
         avg_price_by_path = self.price_simulations.mean(axis=1)
-        asian_payoffs = np.maximum(avg_price_by_path - self.K, 0)
-        return self.price_result(asian_payoffs)
+        self.arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - self.K, 0)
+        return self.price_result(self.arithmetic_asian_call_payoffs)
     
     def arithmetic_asian_put_price(self):
         avg_price_by_path = self.price_simulations.mean(axis=1)
@@ -87,8 +87,24 @@ class MonteCarloPricer:
     
     def geometric_asian_call_price(self):
         geometric_avg_price_by_path = np.sqrt(self.price_simulations[:,0]*self.price_simulations[:,1])
-        asian_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
-        return self.price_result(asian_payoffs)
+        self.geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
+        return self.price_result(self.geometric_asian_call_payoffs)
+    
+    def arithmetic_asian_call_price_with_control_variate(self, exact_geometric_price):
+        avg_price_by_path = self.price_simulations.mean(axis=1)
+        self.arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - self.K, 0)
+        
+        geometric_avg_price_by_path = np.sqrt(self.price_simulations[:,0]*self.price_simulations[:,1])
+        self.geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
+        
+        X = self.arithmetic_asian_call_payoffs
+        Y = self.geometric_asian_call_payoffs
+        
+        beta = np.cov(X, Y)[0,1] / np.var(Y)
+        Z = X - beta * (Y - exact_geometric_price*np.exp(self.rf*self.T))
+    
+        price, std_error = self.price_result(Z)
+        return price, std_error, beta
 
 def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))

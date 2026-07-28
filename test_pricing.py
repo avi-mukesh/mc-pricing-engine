@@ -68,9 +68,20 @@ print('bs european call price {:.3f}\n'.format(bs_european_call))
 
 
 print('=====testing geometric asian call price=====')
-mc_geometric_asian_call, std_error = mc_pricer.geometric_asian_call_price()
+mc_geometric_asian_call, std_error_geometric = mc_pricer.geometric_asian_call_price()
 bs_geometric_asian_call = bs_geometric_asian_call_price(params)
 print('mc (n=2) geometric asian call price {:.3f}'.format(mc_geometric_asian_call))
 print('bs geometric asian call price {:.3f}'.format(bs_geometric_asian_call))
+print('standard error {:.4f}\n'.format(std_error_geometric))
+assert(abs(mc_geometric_asian_call - bs_geometric_asian_call) < 2 * std_error_geometric)
+
+
+print('=====testing asian call price: MC vs control variate')
+mc_asian_call_control_variate, std_error, beta = mc_pricer.arithmetic_asian_call_price_with_control_variate(bs_geometric_asian_call)
+print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
+print('arithmetic asian call price with control variate {:.3f}'.format(mc_asian_call_control_variate))
 print('standard error {:.4f}\n'.format(std_error))
-assert(abs(mc_geometric_asian_call - bs_geometric_asian_call) < 2 * std_error)
+print('beta {:.4f}'.format(beta))
+rho = np.corrcoef(mc_pricer.arithmetic_asian_call_payoffs, mc_pricer.geometric_asian_call_payoffs)[0, 1]
+print('correlation between arithmetic and geometric payoffs (rho) {:.4f}'.format(rho))
+assert(abs(mc_asian_call - mc_asian_call_control_variate) < 2 * beta * std_error_geometric)
