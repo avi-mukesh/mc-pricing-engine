@@ -142,7 +142,7 @@ $$e^{-rT}(\mathbb{E}[G]N(d_1)-KN(d_2))$$
 
 A control variate needs two properties: its expectation must be known exactly, and it must be strongly correlated with the target. We know the price of the geometric option exactly (derived above) and since both the arithmetic Asian and geometric Asian use the same price path, their prices are correlated. This lets us build a lower variance estimator for the arithmetic Asian.
 
-If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta Cov(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.107, whereas the price using the control variate gives 8.112. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
+If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta \mathrm{Cov}(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{\mathrm{Cov}(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.107, whereas the price using the control variate gives 8.112. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
 
 ### Antithetic Variate
 
@@ -152,13 +152,13 @@ Let $f$ represent the arithmetic call payoff as a function of the shocks $Z$. Si
 
 $$
 \begin{aligned}
-\mathrm{Var}(\frac{1}{2}(f(Z)+f(-Z))) &= \frac{1}{4}\mathrm{Var}(f(Z))+\frac{1}{4}\mathrm{Var}(f(-Z))+\frac{1}{2}Cov(f(Z), f(-Z)) \\
+\mathrm{Var}(\frac{1}{2}(f(Z)+f(-Z))) &= \frac{1}{4}\mathrm{Var}(f(Z))+\frac{1}{4}\mathrm{Var}(f(-Z))+\frac{1}{2}\mathrm{Cov}(f(Z), f(-Z)) \\
 &= \frac{1}{2}\mathrm{Var}(f(Z)) + \frac{1}{2}\rho \mathrm{Var}(f(Z)) \\
 &= \frac{1}{2}\mathrm{Var}(f(Z))(1+\rho)
 \end{aligned}
 $$
 
-Where $\rho = corr(f(Z), f(-Z))$.
+Where $\rho = \mathrm{corr}(f(Z), f(-Z))$.
 
 This is the variance of a single pair-average, not of the estimator. To compare estimators fairly, hold the total number payoff evaluations fixed at $N$. The plain estimator averages $N$ independent draws, whereas the antithetic one averages $\frac{N}{2}$ independent pairs. So, writing $\mathrm{Var}(f)$ for $\mathrm{Var}(f(Z))$, $$\frac{SE_{\text{antithetic}}}{SE_{\text{plain}}} = \frac{\frac{\sqrt{\frac{1}{2}\mathrm{Var}(f)(1+\rho)}}{\sqrt{\frac{N}{2}}}}{\frac{\sqrt{\mathrm{Var}(f)}}{\sqrt{N}}} = \sqrt{\frac{\frac{1}{2}\mathrm{Var}(f)(1+\rho)}{\mathrm{Var}(f)}}\cdot\sqrt{2} = \sqrt{1+\rho}$$
 
@@ -196,21 +196,21 @@ We measure $\rho=-0.5173$, predicting $SE_{antithetic} = 0.0356\sqrt{1-0.5173} \
 
 To simulate a full path (rather than just the terminal price), the SDE is discretised into `n` steps of size $dt = T/n$:
 
-$$S_t = S_{t-1}\exp\left((r_f-\frac{1}{2}\sigma^2)dt+\sigma\sqrt{dt}\,z_{t-1}\right)$$
+$$S_t = S_{t-1}\exp\left(\left(r_f-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}\,z_{t-1}\right)$$
 
 Taking logs and unrolling the recursion:
 
 $$
 \begin{aligned}
-\ln S_t &= \ln S_{t-1} + (r_f-\frac{1}{2}\sigma^2)dt+\sigma\sqrt{dt}\,z_{t-1} \\
+\ln S_t &= \ln S_{t-1} + \left(r_f-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}\,z_{t-1} \\
 &= \dots \\
-&= \ln S_0 + (r_f-\frac{1}{2}\sigma^2)T+\sigma\sqrt{dt}(z_0+\dots+z_{t-1})
+&= \ln S_0 + \left(r_f-\frac{1}{2}\sigma^2\right)T+\sigma\sqrt{dt}(z_0+\dots+z_{t-1})
 \end{aligned}
 $$
 
 Since the sum of independent Normals is Normal, with variance equal to the sum of the variances, summing all the $\sqrt{dt}\,z_t$ terms gives $\sqrt{T}z$. This recovers the same closed form used for the terminal price:
 
-$$S_t=S_0\exp\left((r_f-\frac{1}{2}\sigma^2)T+\sigma\sqrt{T}z\right)$$
+$$S_t=S_0\exp\left(\left(r_f-\frac{1}{2}\sigma^2\right)T+\sigma\sqrt{T}z\right)$$
 
 confirming that simulating step-by-step and jumping straight to the terminal price are consistent.
 
