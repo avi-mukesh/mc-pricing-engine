@@ -25,7 +25,7 @@ Black-Scholes calculates the same expectation, but analytically, so gives an exa
 
 ### Asian Options
 
-Asian options are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $(\frac{S(1)+\dots+S(N)}{N}-K)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly ($2^n$ distinct paths to track at level $n$ instead of $n+1$ now), which is where MC will prove useful.
+Asian options are path-dependent, meaning their payoff depends on not just the terminal price $S(T)$, but on intermediate prices as well. In particular, the payoff is $\left(\frac{S(1)+\dots+S(N)}{N}-K\right)^+$. This results in the tree to not be recombining anymore, so using the binomial model to price these options in discrete time becomes very costly ($2^n$ distinct paths to track at level $n$ instead of $n+1$ now), which is where MC will prove useful.
 
 For validating the Asian option pricer, I use the two-step binomial model in the case we only have $N=2$ timesteps. The binomial model takes $u$, $d$ as inputs (two possible simple returns e.g. 3% and -5%), rather than $\sigma$.
 
@@ -39,7 +39,7 @@ CRR defines $\ln(1+u)=\sigma\sqrt{dt}$ so $u=e^{\sigma\sqrt{dt}}-1$, and $d=e^{-
 
 With $(u,d,p)$ calibrated to $\sigma$, both models share the same per-step mean and variance. But they do **not** sample the same distribution: MC draws the exact lognormal step, whereas the tree replaces it with a two-point approximation. So at $n=2$ the tree also carries discretation error and is not an exact anchor.
 
-I confirmed this directly by pricing a vanilla European on the same 2-step tree to get $\approx 9.5$ against a Black–Scholes value of $10.451$, which is a significant gap on an option that has already been validated. The tree is therefore a *convergent* check only. As its step count increases (averaging still at the two monitoring dates), its Asian price should converge to the MC value. In next section, we look at geometric Asians, for which there is an exact closed-form anchor we can derive as use.
+I confirmed this directly by pricing a vanilla European on the same 2-step tree to get $\approx 9.541$ against a Black–Scholes value of $10.451$, which is a significant gap on an option that has already been validated. The tree is therefore a *convergent* check only. As its step count increases (averaging still at the two monitoring dates), its Asian price should converge to the MC value. In next section, we look at geometric Asians, for which there is an exact closed-form anchor we can derive and use.
 
 ### Geometric Asian
 Setting $m=(r-\frac{1}{2}\sigma^2)dt$ and $s=\sigma\sqrt{dt}$.
@@ -142,7 +142,7 @@ $$e^{-rT}(\mathbb{E}[G]N(d_1)-KN(d_2))$$
 
 A control variate needs two properties: its expectation must be known exactly, and it must be strongly correlated with the target. We know the price of the geometric option exactly (derived above) and since both the arithmetic Asian and geometric Asian use the same price path, their prices are correlated. This lets us build a lower variance estimator for the arithmetic Asian.
 
-If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta Cov(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.164, whereas the price using the control variate gives 8.111. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
+If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta Cov(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.107, whereas the price using the control variate gives 8.112. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
 
 ### Antithetic Variate
 
@@ -166,7 +166,13 @@ So $\rho<0$ reduces the error, $\rho=0$ does nothing, and $\rho>0$ makes it wors
 
 We measure $\rho=-0.5173$, predicting $SE_{antithetic} = 0.0356\sqrt{1-0.5173} \approx 0.0247$. The simulation gives $0.0248$, a reduction by factor of $\approx 1.44$, which is modest compared to the variance reduction obtained from the control variate previously.
 
-TODO:explain why -0.5173
+### Summary of results for arithmetic Asian
+
+| Estimator | Price | Standard error | Reduction |
+|---|---|---|---|
+| Plain MC | 8.107 | 0.0356 | - |
+| Control Variate | 8.112 | 0.0010 | 35x |
+| Antithetic Variate | 8.107 | 0.0248 | 1.44x |
 
 ## Parameters
 
