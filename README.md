@@ -144,6 +144,29 @@ A control variate needs two properties: its expectation must be known exactly, a
 
 If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta Cov(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.164, whereas the price using the control variate gives 8.111. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
 
+### Antithetic Variate
+
+Antithetic variates exploit the symmetry of the Normal distribution. If $Z$ is a valid draw, then so is $-Z$. Rather than simulating $N$ independent paths, we simulate $\frac{N}{2}$ and pair each with its mirror, averaging the two payoffs. Unlike the control variate, where we needed the price of a geometric Asian, this requires no outside knowledge. We only need the fact that the Normal distribution is symmetric.
+
+Let $f$ represent the arithmetic call payoff as a function of the shocks $Z$. Since $f(Z)$ and $f(-Z)$ have the same distribution
+
+$$
+\begin{aligned}
+\mathrm{Var}(\frac{1}{2}(f(Z)+f(-Z))) &= \frac{1}{4}\mathrm{Var}(f(Z))+\frac{1}{4}\mathrm{Var}(f(-Z))+\frac{1}{2}Cov(f(Z), f(-Z)) \\
+&= \frac{1}{2}\mathrm{Var}(f(Z)) + \frac{1}{2}\rho \mathrm{Var}(f(Z)) \\
+&= \frac{1}{2}\mathrm{Var}(f(Z))(1+\rho)
+\end{aligned}
+$$
+
+Where $\rho = corr(f(Z), f(-Z))$.
+
+This is the variance of a single pair-average, not of the estimator. To compare estimators fairly, hold the total number payoff evaluations fixed at $N$. The plain estimator averages $N$ independent draws, whereas the antithetic one averages $\frac{N}{2}$ independent pairs. So, writing $\mathrm{Var}(f)$ for $\mathrm{Var}(f(Z))$, $$\frac{SE_{\text{antithetic}}}{SE_{\text{plain}}} = \frac{\frac{\sqrt{\frac{1}{2}\mathrm{Var}(f)(1+\rho)}}{\sqrt{\frac{N}{2}}}}{\frac{\sqrt{\mathrm{Var}(f)}}{\sqrt{N}}} = \sqrt{\frac{\frac{1}{2}\mathrm{Var}(f)(1+\rho)}{\mathrm{Var}(f)}}\cdot\sqrt{2} = \sqrt{1+\rho}$$
+
+So $\rho<0$ reduces the error, $\rho=0$ does nothing, and $\rho>0$ makes it worse.
+
+We measure $\rho=-0.5173$, predicting $SE_{antithetic} = 0.0356\sqrt{1-0.5173} \approx 0.0247$. The simulation gives $0.0248$, a reduction by factor of $\approx 1.44$, which is modest compared to the variance reduction obtained from the control variate previously.
+
+TODO:explain why -0.5173
 
 ## Parameters
 

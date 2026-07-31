@@ -19,6 +19,8 @@ class MonteCarloPricer:
         self.iterations = iterations
         self.terminal_prices = None
         self.price_simulations = None
+        self.antithetic_price_simulations_pos = None
+        self.antithetic_price_simulations_neg = None
         
         self.rng = np.random.default_rng(rng_seed) if rng_seed is not None else np.random.default_rng()
         
@@ -39,6 +41,15 @@ class MonteCarloPricer:
         
         z = self.rng.normal(0, 1, self.iterations)
         self.terminal_prices = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * z)
+
+    def simulate_antithetic_price_paths(self, n: int = 252):
+        if self.antithetic_price_simulations_pos is not None:
+            return
+        
+        dt = self.T/n
+        z = self.rng.normal(0, 1, (self.iterations//2, n))
+        self.antithetic_price_simulations_pos = self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*z, axis=1))
+        self.antithetic_price_simulations_neg = self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*-z, axis=1))
     
     def price_result(self, payoffs):
         # discount to present time
@@ -104,6 +115,24 @@ class MonteCarloPricer:
     
         price, std_error = self.price_result(Z)
         return price, std_error, beta
+    
+    def arithmetic_asian_call_price_with_antithetic_variate(self):
+        avg_price_by_path_pos = self.antithetic_price_simulations_pos.mean(axis=1)
+        avg_price_by_path_neg = self.antithetic_price_simulations_neg.mean(axis=1)
+        
+        print('correlation beteen avg pos paths and avg neg paths {:.4f}'.format(np.corrcoef(avg_price_by_path_pos, avg_price_by_path_neg)[0,1]))
+        
+        self.asian_payoffs_antithetic_pos = np.maximum(avg_price_by_path_pos - self.K, 0)
+        self.asian_payoffs_antithetic_neg = np.maximum(avg_price_by_path_neg - self.K, 0)
+        
+        payoffs_avg = 0.5*(self.asian_payoffs_antithetic_pos+self.asian_payoffs_antithetic_neg)
+        
+        discounted_payoffs = payoffs_avg * np.exp(-self.rf * self.T)
+
+        price = np.mean(discounted_payoffs)
+        standard_error = np.std(discounted_payoffs) / np.sqrt(self.iterations//2)
+        
+        return price, standard_error
 
 def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
