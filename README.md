@@ -29,11 +29,11 @@ Asian options are path-dependent, meaning their payoff depends on not just the t
 
 For validating the Asian option pricer, I use the two-step binomial model in the case we only have $N=2$ timesteps. The binomial model takes $u$, $d$ as inputs (two possible simple returns e.g. 3% and -5%), rather than $\sigma$.
 
-To make the translation, let $M$ be a two-point random variable, representing the log return, taking values $\ln(1+u)$ and $\ln(1+d)$ with probabilities $p$ and $1-p$ respectively. The log return over one step in GBM is $$\ln(\frac{S_{t+dt}}{S_t}) = (r-\frac{1}{2}\sigma^2)dt+\sigma\sqrt{dt}z$$
+To make the translation, let $M$ be a two-point random variable, representing the log return, taking values $\ln(1+u)$ and $\ln(1+d)$ with probabilities $p$ and $1-p$ respectively. The log return over one step in GBM is $$\ln\left(\frac{S_{t+dt}}{S_t}\right) = \left(r-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}z$$
 
-which is $N((r-\frac{1}{2}\sigma^2)dt, \sigma^2dt)$. So equate $Var(M) = \sigma^2dt$ and simplify to get $$p(1-p)(\ln(1+u)-\ln(1+d))^2=\sigma^2dt$$
+which is $N\left(\left(r-\frac{1}{2}\sigma^2\right)dt, \sigma^2dt\right)$. So equate $\mathrm{Var}(M) = \sigma^2dt$ and simplify to get $$p(1-p)(\ln(1+u)-\ln(1+d))^2=\sigma^2dt$$
 
-Also set up an equation relating the mean. We equate the expected growth factor from one step of the binomial model to the expected growth factor over $dt$ in GBM. Expected growth factor from one step of the binomial model is $$p(1+u)+(1-p)(1+d)$$ and expected growth factor over $dt$ in GBM is $\mathbb{E}[\frac{S_{t+dt}}{S_t}]=\mathbb{E}[\exp((r-\frac{1}{2}\sigma^2)dt+\sigma\sqrt{dt}z)]$ which can be calculated (noting that it is the [M.G.F](https://www.le.ac.uk/users/dsgp1/COURSES/MATHSTAT/6normgf.pdf) of a Normal distribution evaluated at $t=1$) to give $$\exp((r-\frac{1}{2}\sigma^2)dt+\frac{1}{2}\sigma^2dt) = e^{rdt}$$ Equating the two expected growth factors gives $$p(1+u)+(1-p)(1+d)=e^{rdt}$$ So far we only have 2 equations but 3 unknowns ($u, d, p$) so we need to impose a third condition. We can choose this freely because it won't matter for convergence in the limit, so let's constrain $$(1+u)(1+d)=1 \implies \ln(1+u)=-\ln(1+d)$$ as this recombines the tree symmetrically. Substitute this into first equation to get $$4p(1-p)(\ln(1+u))^2=\sigma^2dt$$
+Also set up an equation relating the mean. We equate the expected growth factor from one step of the binomial model to the expected growth factor over $dt$ in GBM. Expected growth factor from one step of the binomial model is $$p(1+u)+(1-p)(1+d)$$ and expected growth factor over $dt$ in GBM is $\mathbb{E}[\frac{S_{t+dt}}{S_t}]=\mathbb{E}\left[\exp\left(\left(r-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}z\right)\right]$ which can be calculated (noting that it is the [M.G.F](https://www.le.ac.uk/users/dsgp1/COURSES/MATHSTAT/6normgf.pdf) of a Normal distribution evaluated at $t=1$) to give $$\exp\left(\left(r+\frac{1}{2}\sigma^2\right)dt+\frac{1}{2}\sigma^2dt\right) = e^{rdt}$$ Equating the two expected growth factors gives $$p(1+u)+(1-p)(1+d)=e^{rdt}$$ So far we only have 2 equations but 3 unknowns ($u, d, p$) so we need to impose a third condition. We can choose this freely because it won't matter for convergence in the limit, so let's constrain $$(1+u)(1+d)=1 \implies \ln(1+u)=-\ln(1+d)$$ as this recombines the tree symmetrically. Substitute this into first equation to get $$4p(1-p)(\ln(1+u))^2=\sigma^2dt$$
 
 CRR defines $\ln(1+u)=\sigma\sqrt{dt}$ so $u=e^{\sigma\sqrt{dt}}-1$, and $d=e^{-\sigma\sqrt{dt}}-1$. This means the variance equation is no longer solved exactly. The mean equation forces $p=\frac{1}{2}+O(\sqrt{dt})$ so $4p(1-p)=1-O(dt)$ and the variance is matched only up to an $O(dt^2)$ error per step. Over $N=T/dt$ steps these errors total $O(dt)$, which vanishes in the limit.
 
@@ -62,11 +62,11 @@ So $\ln(G)$ is Normal with
 
 $$\mu_G = \mathbb{E}[\ln(G)]=\ln(S_0)+\frac{3}{2}m$$
 
-$$\sigma_G^2 = Var[\ln(G)]=s^2+(\frac{1}{2}s)^2=\frac{5}{4}s^2$$
+$$\sigma_G^2 = Var[\ln(G)]=s^2+\left(\frac{1}{2}s\right)^2=\frac{5}{4}s^2$$
 
 After a bit of algebra (like calculating M.G.F at t=1) we get
 
-$$\mathbb{E}[G]=\mathbb{E}[e^{\ln(G)}] = \dots = S_0e^{(\frac{3}{2}r-\frac{1}{8}\sigma^2)dt}$$
+$$\mathbb{E}[G]=\mathbb{E}[e^{\ln(G)}] = \dots = S_0e^{\left(\frac{3}{2}r-\frac{1}{8}\sigma^2\right)dt}$$
 
 Notice the drift here is $\frac{3}{2}rdt$, not $rdt$. $G$ is not a tradeable asset, so no-arbitrage does not force it to grow at the risk-free rate. It's drift is simply what the averaging produces. This is why we cannot use BS with an effective volatility, and must instead evaluate
 
@@ -142,7 +142,7 @@ $$e^{-rT}(\mathbb{E}[G]N(d_1)-KN(d_2))$$
 
 A control variate needs two properties: its expectation must be known exactly, and it must be strongly correlated with the target. We know the price of the geometric option exactly (derived above) and since both the arithmetic Asian and geometric Asian use the same price path, their prices are correlated. This lets us build a lower variance estimator for the arithmetic Asian.
 
-If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $Var(Z) = Var(X)-2\beta Cov(X,Y)+\beta^2Var(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{Var(Y)}$, which gives $Var(Z) = Var(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.164, whereas the price using the control variate gives 8.111. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
+If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta Cov(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{Cov(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.164, whereas the price using the control variate gives 8.111. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
 
 
 ## Parameters
@@ -200,8 +200,8 @@ $C$ and $P$ are means of discounted payoffs over the same paths.
 
 $$
 \begin{aligned}
-C-P &= \frac{1}{N}\sum_{i=1}^N(e^{-r_fT}(S_i-K)^+) - \frac{1}{N}\sum_{i=1}^N(e^{-r_fT}(K-S_i)^+) \\
-&= e^{-r_fT}\frac{1}{N}\sum_{i=1}^N((S_i-K)^+-(K-S_i)^+) && \text{( because same paths)} \\
+C-P &= \frac{1}{N}\sum_{i=1}^N\left(e^{-r_fT}(S_i-K)^+\right) - \frac{1}{N}\sum_{i=1}^N\left(e^{-r_fT}(K-S_i)^+\right) \\
+&= e^{-r_fT}\frac{1}{N}\sum_{i=1}^N\left((S_i-K)^+-(K-S_i)^+\right) && \text{(because same paths)} \\
 &= e^{-r_fT}\frac{1}{N}\sum_{i=1}^N(S_i-K) \\
 &= e^{-r_fT}\frac{1}{N}\sum_{i=1}^N S_i-Ke^{-r_fT}
 \end{aligned}
