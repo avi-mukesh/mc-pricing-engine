@@ -248,3 +248,11 @@ $$
 So the put-call parity in this case is basically checking how close $e^{-r_fT}\frac{1}{N}\sum_{i=1}^N S_i$, the discounted mean, gets to $S_0$
 
 This is why we use standard error of the discounted final prices in the put-call parity assertion.
+
+## Convergence
+Let $\sigma_{\text{payoffs}}$ represent the standard deviation of the discounted payoffs. Since $SE_{\text{payoffs}} = \frac{\sigma_{\text{payoffs}}}{\sqrt{N}}$, taking logs gives $\log(SE_{\text{payoffs}})=\log(\sigma_{\text{payoffs}})-0.5\log(N)$. So plotting log of the standard errors against log of the number of simulations, we get a straight line with gradient $-0.5$ and intercept $\log(\sigma_{\text{payoffs}})$. Plotting for $N=10^3, 10^4, 10^5, 10^6$ simulations, we get a gradient of -0.4959, and an estimate for $\sigma_{\text{payoffs}}$ of 13.9374.
+
+The downside of Monte Carlo simulations is the slow convergence. Halving the error requires quadrupling the number of iterations. This is why variance reduction matters. The control variate's 35x improvement would have required 1225x more simulations to achieve by brute force.
+
+
+![Plot of log(SE) against log(N)](/convergence.png)
