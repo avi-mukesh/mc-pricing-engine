@@ -256,3 +256,13 @@ The downside of Monte Carlo simulations is the slow convergence. Halving the err
 
 
 ![Plot of log(SE) against log(N)](/convergence.png)
+
+## Greeks
+
+Delta measures the rate of change of the price of the option with respect to a move in the underlying asset.
+$$\Delta = \frac{\partial C}{\partial S}$$
+We can calculate this numerically using a finite difference approach $\frac{C(S+h)-C(S)}{h}$
+
+From Black-Scholes $C=S_0N(d_1)-Ke^{-rT}N(d_2)$, analytically we have as an anchor $\Delta = N(d_1)$ (TODO: verify on paper)
+
+$$d_1 = \frac{\log\left(\frac{S_0}{K}\right)+r_f+0.5\sigma^2T}{\sigma\sqrt{T}}$$
