@@ -259,10 +259,38 @@ The downside of Monte Carlo simulations is the slow convergence. Halving the err
 
 ## Greeks
 
+### Finding delta analytically
+
 Delta measures the rate of change of the price of the option with respect to a move in the underlying asset.
-$$\Delta = \frac{\partial C}{\partial S}$$
+$$\Delta = \frac{\partial C}{\partial S_0}$$
+
+From Black-Scholes $C=S_0N(d_1)-Ke^{-rT}N(d_2)$, analytically we have as an anchor $\Delta = N(d_1)$. To verify this, write
+
+$$\frac{\partial C}{\partial S_0} = N(d_1) + S_0N'(d_1)\frac{\partial d_1}{\partial S_0} - Ke^{-rT}N'(d_2)\frac{\partial d_2}{\partial S_0}$$
+
+Since we have
+
+$$d_1 = \frac{\log\left(\frac{S_0}{K}\right)+(r_f+0.5\sigma^2)T}{\sigma\sqrt{T}}
+\qquad \text{and} \qquad d_2 = d_1 - \sigma\sqrt{T}$$
+
+the two partials are equal $\frac{\partial d_1}{\partial S_0} = \frac{\partial d_2}{\partial S_0}$. So just need to ensure that $S_0N'(d_1) = Ke^{-rT}N'(d_2)$. We have $N'(x) = \frac{1}{\sqrt{2\pi}}e^{-\frac{1}{2}x^2}$ so
+
+$$
+\begin{aligned}
+Ke^{-r_fT}N'(d_2) &= Ke^{-r_fT}N'(d_1-\sigma\sqrt{T}) \\
+&= Ke^{-r_fT}\frac{1}{\sqrt{2\pi}}e^{-\frac{1}{2}(d_1-\sigma\sqrt{T})^2} \\
+&= \frac{K}{\sqrt{2\pi}}e^{-\frac{1}{2}d_1^2+d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT} \\
+&= S_0\frac{1}{\sqrt{2\pi}}e^{-\frac{1}{2}d_1^2}\cdot \frac{K}{S_0}e^{d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT} \\
+&= S_0N(d_1)\exp\left(\ln\left(\frac{K}{S_0}\right)+d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT\right)
+\end{aligned}
+$$
+
+Substituting in for $d_1$, the expression in the exponent becomes
+
+$$\ln\left(\frac{K}{S_0}\right)+\left(\frac{\log\left(\frac{S_0}{K}\right)+\left(r_f+\frac{1}{2}\sigma^2\right)T}{\sigma\sqrt{T}}\right)\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT = 0.$$
+
+Hence $S_0N'(d_1) = Ke^{-rT}N'(d_2)$, so the last two terms in the expansion of $\frac{\partial C}{\partial S_0}$ above cancel, and $\Delta = N(d_1)$.
+
+### Finding delta numerically
+
 We can calculate this numerically using a finite difference approach $\frac{C(S+h)-C(S)}{h}$
-
-From Black-Scholes $C=S_0N(d_1)-Ke^{-rT}N(d_2)$, analytically we have as an anchor $\Delta = N(d_1)$ (TODO: verify on paper)
-
-$$d_1 = \frac{\log\left(\frac{S_0}{K}\right)+r_f+0.5\sigma^2T}{\sigma\sqrt{T}}$$
