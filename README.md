@@ -293,4 +293,6 @@ Hence $S_0N'(d_1) = Ke^{-rT}N'(d_2)$, so the last two terms in the expansion of 
 
 ### Finding delta numerically
 
-We can calculate this numerically using a finite difference approach $\frac{C(S+h)-C(S)}{h}$
+We can estimate $\Delta$ numerically using a finite difference approach, by pricing the option at $S_0$ and at $S_0+h$, then
+
+$$\Delta \approx \frac{C(S_0+h)-C(S_0)}{h}$$
