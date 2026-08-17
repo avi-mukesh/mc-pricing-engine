@@ -326,3 +326,42 @@ Measuring this directly: over 50 independent seed pairs at $h = 0.01$, the estim
 The small drift under CRN from $0.6368$ to $0.6358$ is the forward-difference bias vanishing as $h \to 0$; the residual gap to the exact value is Monte Carlo error in the price *level*, which CRN cannot remove (the MC price 10.4363 isn't the true 10.4506) — it cancels noise in the *difference*, not in either price individually.
 
 So the trade-off is asymmetric. Too large an $h$ introduces $O(h)$ bias; too small an $h$ amplifies noise. With CRN, bias dominates and small $h$ is safe. Without CRN, variance dominates and there is a floor below which $h$ cannot usefully go. Common random numbers are not an optimisation here — they are what makes finite-difference Greeks viable at all.
+
+### Pathwise Greeks
+From the definition of call price $C=e^{-rT}\mathbb{E}[\text{payoff}]$ so from the definition of delta,
+
+$$\Delta = e^{-rT}\mathbb{E}\left[\frac{\partial}{\partial S_0}\text{payoff}\right]$$
+
+By the chain rule, $$\frac{\partial}{\partial S_0}\text{payoff} = \frac{\partial}{\partial S_T}\text{payoff}\cdot\frac{\partial S_T}{\partial S_0}$$
+
+$\frac{\partial S_T}{S_0}$ is simply $\exp\left((r_f-\frac{1}{2}\sigma^2)T+\sigma W_T\right) = \frac{S_T}{S_0}$ and since payoff is $\max(S_T-K, 0)$, we have
+
+$$
+\frac{\partial}{\partial S_T}\text{payoff} = \begin{cases}
+			1, & \text{if $S_T>K$}\\
+            0, & \text{if $S_T<K$}
+		 \end{cases}
+$$
+
+So 
+
+$$
+\frac{\partial}{\partial S_0}\text{payoff} = \begin{cases}
+			\frac{S_T}{S_0}, & \text{if $S_T>K$}\\
+            0, & \text{if $S_T<K$}
+		 \end{cases}
+$$
+
+So
+
+$$
+\mathbb{E}\left[\frac{\partial}{\partial S_0}\text{payoff}\right] = \mathbb{E}\left[\frac{S_T}{S_0}1_{\{S_T>K\}}\right]
+$$
+
+So $$\Delta = e^{-rT}\mathbb{E}\left[\frac{S_T}{S_0}1_{\{S_T>K\}}\right]$$
+
+TODO: the result
+TODO: observation that this rederives the BS delta
+TODO: downside = derivative undefined at S_T=K
+
+Next up: likelihood ratio
