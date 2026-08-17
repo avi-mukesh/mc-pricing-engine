@@ -296,3 +296,33 @@ Hence $S_0N'(d_1) = Ke^{-rT}N'(d_2)$, so the last two terms in the expansion of 
 We can estimate $\Delta$ numerically using a finite difference approach, by pricing the option at $S_0$ and at $S_0+h$, then
 
 $$\Delta \approx \frac{C(S_0+h)-C(S_0)}{h}$$
+
+This is the definition of the derivative, with the limit stopped short. The choice of $h$ is a tradeoff as shown in the below table. By common random numbers (CRN), we mean the same $Z$ shocks have been used to simulate both $C(S_0)$ and $C(S_0+h)$ so that the two price estimates share their Monte Carlo noise and it largely cancels in the subtraction. Without CRN, each price carries independent noise of size $SE\approx 0.046$, so their difference has standard deviation $SE\sqrt{2}\approx 0.065$. This is then divided by $h$, amplifying delta without bound as $h\to 0$.
+
+**With common random numbers:**
+
+| $h$ | $C(S_0+h)-C(S_0)$ | $\Delta$ |
+|---|---|---|
+| 0.1 | 0.0637 | 0.6368 |
+| 0.01 | 0.0064 | 0.6359 |
+| 0.001 | 0.0006 | 0.6358 |
+| 0.0001 | 0.0001 | 0.6358 |
+
+**With independent random numbers:**
+
+| $h$ | $C(S_0+h)-C(S_0)$ | $\Delta$ |
+|---|---|---|
+| 0.1 | 0.2127 | 2.1271 |
+| 0.01 | 0.1550 | 15.4961 |
+| 0.001 | 0.1492 | 149.1929 |
+| 0.0001 | 0.1486 | 1486.1619 |
+
+Exact value: $\Delta = N(d_1) = 0.6368$. All runs at $N = 100{,}000$ paths, $C(S_0) = 10.4363$.
+
+The numerator column $C(S_0+h)-C(S_0)$ shows that under CRN, the price difference shrinks with $h$, as a genuine derivative should, and the ratio stays near $0.636$ throughout. Under independent draws the difference instead converges to a constant $\approx 0.149$ - the fixed discrepancy between what the two seeds happen to price. As $h \to 0$ the real signal vanishes but that constant does not, so the estimate grows by a factor of ten each time $h$ decreases by a factor of ten.
+
+Measuring this directly: over 50 independent seed pairs at $h = 0.01$, the estimated $\Delta$ has standard deviation $6.63$, against a predicted standard deviation of $\frac{SE\sqrt{2}}{h} \approx 6.5$. The estimator is roughly ten times noisier than the quantity it estimates.
+
+The small drift under CRN from $0.6368$ to $0.6358$ is the forward-difference bias vanishing as $h \to 0$; the residual gap to the exact value is Monte Carlo error in the price *level*, which CRN cannot remove (the MC price 10.4363 isn't the true 10.4506) — it cancels noise in the *difference*, not in either price individually.
+
+So the trade-off is asymmetric. Too large an $h$ introduces $O(h)$ bias; too small an $h$ amplifies noise. With CRN, bias dominates and small $h$ is safe. Without CRN, variance dominates and there is a floor below which $h$ cannot usefully go. Common random numbers are not an optimisation here — they are what makes finite-difference Greeks viable at all.
