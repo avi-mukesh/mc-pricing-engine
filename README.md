@@ -364,7 +364,7 @@ Using this method to estimate $\Delta$ we obtain 0.6358, which is close to the e
 
 The biggest downside of this method is that for a digital payoff, $\frac{\partial}{\partial S_0}\text{payoff} = 0$, so this estimator concludes $\Delta=0$ which is completely incorrect. In the case of a call option, the derivative is undefined at $S_T=K$, which is a measure-zero set, so there is no harm there. But for a digital option, the discontinuity is where the sensitivity of the option to $S_0$ lives, so it can't be ignored. 
 
-Note that this rederives the BS delta
+#### Showing that this rederives the BS delta
 
 Letting $X=\ln(S_T)$, so that $X$ is Normal with mean $\mu=\ln(S_0)+\left(r-\frac{1}{2}\sigma^2\right)T$ and variance $\nu=\sigma^2 T$ the expectation is 
 
@@ -384,4 +384,30 @@ $$ = S_0e^{rT}N\left(\frac{\ln\left(\frac{S_0}{K}\right)+\left(r+\frac{1}{2}\sig
 
 So $$\frac{e^{-rT}}{S_0}\mathbb{E}[S_T1_{S_T>K}] = N\left(\frac{\ln\left(\frac{S_0}{K}\right)+\left(r+\frac{1}{2}\sigma^2\right)T}{\sigma\sqrt{T}}\right) = N(d_1)$$ as required.
 
-Next up: likelihood ratio
+This shows that the pathwise estimator is not approximating something separate from Black-Scholes. Instead, it is sampling the expectation that Black-Scholes evaluated in closed form, hence converged to $N(d_1)$ exactly.
+
+### Likelihood ratio method
+
+With pathwise, we differentiate the payoff, and leave the density alone. Here, we leave the payoff alone, and differentiate the density
+
+$$C=e^{-rT}\int \text{payoff}(x)f(x)\,dx$$
+
+where $f$ is the density of $\ln(S_T)$.
+
+Differentiating under the integral gives 
+
+$$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f}{\partial S_0}\,dx$$
+
+The trick is to multiply and divide by $f$ to get
+
+$$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f/\partial S_0}{f}f(x)\,dx = e^{-rT}\,\mathbb{E}[\text{payoff}(x)\frac{\partial \ln(f)}{\partial S_0}]$$
+
+For Normal with mean $\mu$ and variance $\nu$,
+
+$$\ln f = -\frac{1}{2}ln(2\pi\nu)-\frac{(x-\mu)^2}{2\nu}$$
+
+$$\ln f = -\frac{1}{2}ln(2\pi\sigma^2T)-\frac{(x-\ln(S_0)-\left(r-\frac{1}{2}\sigma^2\right)T)^2}{2\sigma^2T}$$
+
+Differentiating this with respect to $S_0$ we get
+
+$$\frac{(x-\ln(S_0)-\left(r-\frac{1}{2}\sigma^2\right)T)}{S_0\sigma^2T} = \frac{1}{S_0}\frac{x-\mu}{\nu}$$
