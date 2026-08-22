@@ -334,7 +334,7 @@ $$\Delta = e^{-rT}\mathbb{E}\left[\frac{\partial}{\partial S_0}\text{payoff}\rig
 
 By the chain rule, $$\frac{\partial}{\partial S_0}\text{payoff} = \frac{\partial}{\partial S_T}\text{payoff}\cdot\frac{\partial S_T}{\partial S_0}$$
 
-$\frac{\partial S_T}{S_0}$ is simply $\exp\left((r_f-\frac{1}{2}\sigma^2)T+\sigma W_T\right) = \frac{S_T}{S_0}$ and since payoff is $\max(S_T-K, 0)$, we have
+$\frac{\partial S_T}{\partial S_0}$ is simply $\exp\left((r_f-\frac{1}{2}\sigma^2)T+\sigma W_T\right) = \frac{S_T}{S_0}$ and since payoff is $\max(S_T-K, 0)$, we have
 
 $$
 \frac{\partial}{\partial S_T}\text{payoff} = \begin{cases}
@@ -360,8 +360,28 @@ $$
 
 So $$\Delta = e^{-rT}\mathbb{E}\left[\frac{S_T}{S_0}1_{\{S_T>K\}}\right]$$
 
-TODO: the result
-TODO: observation that this rederives the BS delta
-TODO: downside = derivative undefined at S_T=K
+Using this method to estimate $\Delta$ we obtain 0.6358, which is close to the exact 0.6358.
+
+The biggest downside of this method is that for a digital payoff, $\frac{\partial}{\partial S_0}\text{payoff} = 0$, so this estimator concludes $\Delta=0$ which is completely incorrect. In the case of a call option, the derivative is undefined at $S_T=K$, which is a measure-zero set, so there is no harm there. But for a digital option, the discontinuity is where the sensitivity of the option to $S_0$ lives, so it can't be ignored. 
+
+Note that this rederives the BS delta
+
+Letting $X=\ln(S_T)$, so that $X$ is Normal with mean $\mu=\ln(S_0)+\left(r-\frac{1}{2}\sigma^2\right)T$ and variance $\nu=\sigma^2 T$ the expectation is 
+
+$$\int_{\ln(K)}^{\infty}e^x\phi(x;\mu,\nu)\,dx$$
+
+This is exactly the integral we evaluated in the section Geometric Asian, just with different parameters. The result is
+
+$$e^{\mu+\frac{1}{2}\nu}N\left(\frac{(\mu+\nu)-\ln(K)}{\sqrt{\nu}}\right)$$
+
+Substituting back in $\mu$ and $\nu$ we get 
+
+$$e^{\ln(S_0)+\left(r-\frac{1}{2}\sigma^2\right)T+\frac{1}{2}\sigma^2 T}N\left(\frac{\ln(S_0)+\left(r-\frac{1}{2}\sigma^2\right)T+\sigma^2 T-\ln(K)}{\sigma\sqrt{T}}\right)$$
+
+$$ = e^{\ln(S_0)+rT}N\left(\frac{\ln(S_0)+\left(r+\frac{1}{2}\sigma^2\right)T -\ln(K)}{\sigma\sqrt{T}}\right)$$
+
+$$ = S_0e^{rT}N\left(\frac{\ln\left(\frac{S_0}{K}\right)+\left(r+\frac{1}{2}\sigma^2\right)T}{\sigma\sqrt{T}}\right)$$
+
+So $$\frac{e^{-rT}}{S_0}\mathbb{E}[S_T1_{S_T>K}] = N\left(\frac{\ln\left(\frac{S_0}{K}\right)+\left(r+\frac{1}{2}\sigma^2\right)T}{\sigma\sqrt{T}}\right) = N(d_1)$$ as required.
 
 Next up: likelihood ratio
