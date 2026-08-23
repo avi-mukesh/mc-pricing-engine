@@ -398,7 +398,7 @@ Differentiating under the integral gives
 
 $$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f}{\partial S_0}\,dx$$
 
-The trick is to multiply and divide by $f$ to get
+The trick is to multiply and divide the integrand by $f$ to get
 
 $$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f/\partial S_0}{f}f(x)\,dx = e^{-rT}\,\mathbb{E}[\text{payoff}(x)\frac{\partial \ln(f)}{\partial S_0}]$$
 
@@ -411,3 +411,13 @@ $$\ln f = -\frac{1}{2}ln(2\pi\sigma^2T)-\frac{(x-\ln(S_0)-\left(r-\frac{1}{2}\si
 Differentiating this with respect to $S_0$ we get
 
 $$\frac{(x-\ln(S_0)-\left(r-\frac{1}{2}\sigma^2\right)T)}{S_0\sigma^2T} = \frac{1}{S_0}\frac{x-\mu}{\nu}$$
+
+We know $\ln(S_T) = \mu + \sigma\sqrt{T}Z$ so $x-\mu = \sigma\sqrt{T}Z$ so 
+
+$$\frac{1}{S_0}\frac{x-\mu}{\nu} = \frac{Z}{S_0\sigma\sqrt{T}}$$
+
+So the estimator is 
+
+$$\Delta = e^{-rT}\mathbb{E}\left[\text{payoff}\cdot\frac{Z}{S_0\sigma\sqrt{T}}\right]$$
+
+Simulating this in code, we get 0.6361.

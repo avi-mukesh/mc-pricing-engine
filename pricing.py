@@ -39,8 +39,8 @@ class MonteCarloPricer:
         if self.terminal_prices is not None:
             return
         
-        z = self.rng.normal(0, 1, self.iterations)
-        self.terminal_prices = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * z)
+        self.z = self.rng.normal(0, 1, self.iterations)
+        self.terminal_prices = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * self.z)
 
     def simulate_antithetic_price_paths(self, n: int = 252):
         if self.antithetic_price_simulations_pos is not None:
@@ -62,8 +62,8 @@ class MonteCarloPricer:
         return price, standard_error
     
     def european_call_price(self) -> float:
-        payoffs = np.maximum(self.terminal_prices - self.K, 0)
-        return self.price_result(payoffs)
+        self.european_call_payoffs = np.maximum(self.terminal_prices - self.K, 0)
+        return self.price_result(self.european_call_payoffs)
 
     def european_put_price(self):
         payoffs = np.maximum(self.K - self.terminal_prices, 0)
@@ -133,6 +133,7 @@ class MonteCarloPricer:
         standard_error = np.std(discounted_payoffs) / np.sqrt(self.iterations//2)
         
         return price, standard_error
+    
 
 def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))

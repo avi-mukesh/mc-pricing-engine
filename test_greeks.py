@@ -49,4 +49,11 @@ params = MarketParams(S0, K, T, rf, sigma)
 mc_pricer = MonteCarloPricer(params, iterations, 10101010)
 mc_pricer.simulate_price_paths(2)
 ST = mc_pricer.price_simulations[:,-1]
-print(f"Approximate value of Δ by differentiating pathwise: {np.exp(-rf*T)*np.mean(np.where(ST>K, ST/S0, 0)):.4f}")
+pathwise_delta = np.exp(-rf*T)*np.mean(np.where(ST>K, ST/S0, 0))
+print(f"Approximate value of Δ by differentiating pathwise: {pathwise_delta:.4f}\n")
+
+# likelihood ratio
+mc_pricer.simulate_terminal_prices()
+mc_pricer.european_call_price()
+likelihood_ratio_delta = np.exp(-rf*T)*np.mean(mc_pricer.european_call_payoffs*mc_pricer.z) / (S0 * sigma * np.sqrt(T))
+print(f"Approximate value of Δ using likelihood ratio: {likelihood_ratio_delta:.4f}\n")
