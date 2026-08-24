@@ -1,10 +1,12 @@
 # Monte Carlo Pricer with validation harness
 
-This is the starting point of a larger pricing engine in the works.
+This is an options pricing engine in the works.
 
-Currently, terminal prices are simulated with Monte Carlo, and the price of European calls and puts is validated against Black Scholes.
+I simulate price paths and estimate price of European options, arithmetic Asian options, geometric Asian options. Price of European options is validated against Black Scholes. I derive a similar closed form for geometric Asian options, and use that as a control variate as an anchor for the price of the arithmetic Asian, because that has no closed form. Initially, I try to use the two-step binomial model, but this introduces its own discretisation error.
 
-In future versions, I plan to support exotics, and also migrate to AWS.
+Currently I calculate one of the Greeks, $\Delta$, for a European call, using two methods: pathwise differentiation, and likelihood ratio, and compare them to the exact value predicted by Black Scholes.
+
+In future versions, I plan to migrate to AWS.
 
 ## The maths
 Under risk-neutral measure, we model the stock as GBM $dS_t=r_fS_tdt+\sigma S_t dW_t$.
