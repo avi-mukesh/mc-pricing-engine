@@ -404,9 +404,9 @@ $$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f/\partial S_0}{f}f(x)\,dx
 
 For Normal with mean $\mu$ and variance $\nu$,
 
-$$\ln f = -\frac{1}{2}ln(2\pi\nu)-\frac{(x-\mu)^2}{2\nu}$$
+$$\ln f = -\frac{1}{2}\ln(2\pi\nu)-\frac{(x-\mu)^2}{2\nu}$$
 
-$$\ln f = -\frac{1}{2}ln(2\pi\sigma^2T)-\frac{(x-\ln(S_0)-\left(r-\frac{1}{2}\sigma^2\right)T)^2}{2\sigma^2T}$$
+$$\ln f = -\frac{1}{2}\ln(2\pi\sigma^2T)-\frac{(x-\ln(S_0)-\left(r-\frac{1}{2}\sigma^2\right)T)^2}{2\sigma^2T}$$
 
 Differentiating this with respect to $S_0$ we get
 
@@ -418,6 +418,10 @@ $$\frac{1}{S_0}\frac{x-\mu}{\nu} = \frac{Z}{S_0\sigma\sqrt{T}}$$
 
 So the estimator is 
 
-$$\Delta = e^{-rT}\mathbb{E}\left[\text{payoff}\cdot\frac{Z}{S_0\sigma\sqrt{T}}\right]$$
+$$\Delta = \frac{e^{-rT}}{S_0\sigma\sqrt{T}}\mathbb{E}\left[\text{payoff}\cdot Z\right]$$
+
+This shows that the estimator is a essentially a covariance between the payoff and the shock Normals.
 
 Simulating this in code, we get 0.6361.
+
+The advantage of this method over pathwise differentiation is that it can handle discontinuities. However, the method using pathwise differentiation has a lower variance.

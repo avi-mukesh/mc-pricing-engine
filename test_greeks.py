@@ -44,16 +44,23 @@ for i in range(50):
     deltas.append(fd_delta(0.01, 1000+i, 2000+i, False))
 print(f"Non-CRN, standard deviation of the deltas (with h=0.01): {np.std(deltas):.4f}\n")
 
-# path-wise Greeks
 params = MarketParams(S0, K, T, rf, sigma)
 mc_pricer = MonteCarloPricer(params, iterations, 10101010)
+# path-wise Greeks
 mc_pricer.simulate_price_paths(2)
 ST = mc_pricer.price_simulations[:,-1]
 pathwise_delta = np.exp(-rf*T)*np.mean(np.where(ST>K, ST/S0, 0))
-print(f"Approximate value of Δ by differentiating pathwise: {pathwise_delta:.4f}\n")
+std_error = np.std(np.exp(-rf*T)*np.where(ST>K, ST/S0, 0)) / np.sqrt(iterations)
+print(f"Approximate value of Δ by differentiating pathwise: {pathwise_delta:.4f}")
+print(f"Standard error {std_error:.4f}\n")
+assert(abs(pathwise_delta - delta) < 2 * std_error)
+
 
 # likelihood ratio
 mc_pricer.simulate_terminal_prices()
 mc_pricer.european_call_price()
 likelihood_ratio_delta = np.exp(-rf*T)*np.mean(mc_pricer.european_call_payoffs*mc_pricer.z) / (S0 * sigma * np.sqrt(T))
-print(f"Approximate value of Δ using likelihood ratio: {likelihood_ratio_delta:.4f}\n")
+std_error = np.std(np.exp(-rf*T)*mc_pricer.european_call_payoffs*mc_pricer.z) / (S0 * sigma * np.sqrt(T)) / np.sqrt(iterations)
+print(f"Approximate value of Δ using likelihood ratio: {likelihood_ratio_delta:.4f}")
+print(f"Standard error {std_error:.4f}")
+assert(abs(likelihood_ratio_delta - delta) < 2 * std_error)
