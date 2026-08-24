@@ -134,7 +134,22 @@ class MonteCarloPricer:
         
         return price, standard_error
     
-
+    def delta_using_pathwise_differentiation(self):
+        self.simulate_price_paths(2)
+        ST = self.price_simulations[:,-1]
+        pathwise_samples = np.exp(-self.rf*self.T)*np.where(ST>self.K, ST/self.S0, 0)
+        pathwise_delta = np.mean(pathwise_samples)
+        std_error = np.std(pathwise_samples) / np.sqrt(self.iterations)
+        return pathwise_delta, std_error
+    
+    def delta_using_likelihood_ratio(self):
+        self.simulate_terminal_prices()
+        self.european_call_price()
+        likelihood_ratio_samples = (np.exp(-self.rf*self.T)*self.european_call_payoffs*self.z) / (self.S0 * self.sigma * np.sqrt(self.T))
+        likelihood_ratio_delta = np.mean(likelihood_ratio_samples)
+        std_error = np.std(likelihood_ratio_samples) / np.sqrt(self.iterations)
+        return likelihood_ratio_delta, std_error
+        
 def bs_european_call_price(params: MarketParams):
     d1 = (np.log(params.S0/params.K) + (params.rf + 0.5 * params.sigma ** 2) * (params.T)) / (params.sigma * np.sqrt(params.T))
     d2 = d1 - params.sigma * np.sqrt(params.T)
