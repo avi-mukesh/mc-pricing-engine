@@ -44,6 +44,11 @@ for i in range(50):
     deltas.append(fd_delta(0.01, 1000+i, 2000+i, False))
 print(f"Non-CRN, standard deviation of the deltas (with h=0.01): {np.std(deltas):.4f}\n")
 
+deltas = []
+for i in range(50):
+    deltas.append(fd_delta(0.01, 1000+i, 1000+i, False))
+print(f"CRN, standard deviation of the deltas (with h=0.01): {np.std(deltas):.4f}\n")
+
 params = MarketParams(S0, K, T, rf, sigma)
 mc_pricer = MonteCarloPricer(params, iterations, 10101010)
 

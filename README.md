@@ -432,7 +432,7 @@ The advantage of this method over pathwise differentiation is that it can handle
 
 | Method | $\Delta$ | SE | Works for digitals |
 |---|---|---|---|
-| Finite difference (CRN, h=0.01) | 0.6359 | - | Yes |
+| Finite difference (CRN, h=0.01) | 0.6359 | 0.0016 | Yes |
 | Pathwise differentiation | 0.6358 | 0.0018 | No |
 | Likelihood ratio | 0.6361 | 0.0046 | Yes |
 
