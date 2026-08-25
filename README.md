@@ -427,3 +427,13 @@ This shows that the estimator is a essentially a covariance between the payoff a
 Simulating this in code, we get 0.6361.
 
 The advantage of this method over pathwise differentiation is that it can handle discontinuities. However, the method using pathwise differentiation has a lower variance.
+
+### Summary table
+
+| Method | $\Delta$ | SE | Works for digitals |
+|---|---|---|---|
+| Finite difference (CRN, h=0.01) | 0.6359 | - | Yes |
+| Pathwise differentiation | 0.6358 | 0.0018 | No |
+| Likelihood ratio | 0.6361 | 0.0046 | Yes |
+
+Exact: 0.6368
