@@ -437,3 +437,5 @@ The advantage of this method over pathwise differentiation is that it can handle
 | Likelihood ratio | 0.6361 | 0.0046 | Yes |
 
 Exact: 0.6368
+
+Notice that the finite difference and pathwise approaches both give very similar results and standard error. With shared shocks, the difference is a discrete approximation of the pathwise derivative on the same paths.
