@@ -439,3 +439,25 @@ The advantage of this method over pathwise differentiation is that it can handle
 Exact: 0.6368
 
 Notice that the finite difference and pathwise approaches both give very similar results and standard error. With shared shocks, the difference is a discrete approximation of the pathwise derivative on the same paths.
+
+## VaR (Value at Risk) and ES (Expected Shortfall)
+
+VaR is best defined as part of a sentence.
+
+If your 99% 10-day VaR is $2000 that means there is a 1% chance that your loss over the next 10 day period will exceed $2000.
+
+ES answers the question: "given that we are in the worst 1%, how much do we lose on average?"
+
+We simulate stock prices to 10-days in the future, and price a European call option at time $t=10/252$. We simulate a fixed number `num_simulations = 10000` of different stock paths, resulting in 10000 different future call prices $V(10/252)$. From these we subtract the call price at present $V(0)$ - worked out analytically using Black Scholes - giving an array of possible PnLs over this period. The estimated x% VaR is the (1-x)th percentile of this. I vary the number of Monte Carlos iterations from 1000, 10000, 100000. The following is a table of results showing that as we increase the number of iterations, the VaR obtained via Monte Carlo converges to VaR obtained using Black Scholes. 
+
+| Number of MC iterations | Estimated 99% 10-day VaR | Time taken (s) |
+| -- | -- | -- |
+| 1000 | 5.4338 | 0.3239 |
+| 10000 | 5.1901 | 1.4686 |
+| 100000 | 5.0824 | 14.9436 |
+
+Actual 99% 10-day VaR using BS: 5.0844. Time taken: 0.4197s.
+
+For few iterations, the VaR obtained using MC overshoots the one estimated by BS. This is because TODO:
+
+The cost of using Monte Carlo here is `num_simulations x iterations`

@@ -1,4 +1,6 @@
 from pricing import *
+from time import perf_counter
+
 
 S0 = 100
 K = 100
@@ -20,24 +22,29 @@ V = [0]*num_simulations
 
 print("Calculating 99% 10-day VaR, varying number of iterations in MC simulations")
 for iterations in [1000, 10000, 100000]:
+    start = perf_counter()
     for i in range(num_simulations):    
         params = MarketParams(S_10d[i], K, T-10/252, rf, sigma)
         # using CRN here, as it reduces noise in the pnl differencess
         mc_pricer = MonteCarloPricer(params, iterations, 10101010)
         mc_pricer.simulate_terminal_prices()
         V[i], _ = mc_pricer.european_call_price()
+    end = perf_counter()
         
     pnl = V - V0
     var99 = np.percentile(pnl, 1)
     print(f"{iterations} iterations: ${-var99:.4f}")
+    print(f"Time taken: {end-start:.4f}s")
     
 print()
 
-print()
+start = perf_counter()
 for i in range(num_simulations):    
     params = MarketParams(S_10d[i], K, T-10/252, rf, sigma)
     V[i] = bs_european_call_price(params)
-    
+end = perf_counter()
+
 pnl = V - V0
 var99 = np.percentile(pnl, 1)
 print(f"Exact VaR using BS ${-var99:.4f}")
+print(f"Time taken: {end-start:.4f}s")
