@@ -1,0 +1,30 @@
+from pricing import *
+
+S0 = 100
+K = 100
+T = 1
+rf = 0.05
+sigma = 0.2
+iterations = 100
+
+params = MarketParams(S0, K, T, rf, sigma)
+mc_pricer = MonteCarloPricer(params, iterations, 10101010)
+mc_pricer.simulate_terminal_prices()
+V0, _ = mc_pricer.european_call_price()
+
+
+num_simulations = 10000
+rng = np.random.default_rng()
+z = rng.normal(0, 1, num_simulations)
+
+# simulate one GBM step of stock price to get it's price at t=10/252
+# for each simulation, run MC to price the option. option has life T-10/252 left
+S_10d = S0 * np.exp((rf - 0.5 * sigma ** 2)*(10/252) + sigma * np.sqrt(10/252) * z)
+V = [0]*num_simulations
+for i in range(num_simulations):    
+    params = MarketParams(S_10d[i], K, T-10/252, rf, sigma)
+    mc_pricer = MonteCarloPricer(params, iterations, 10101010)
+    mc_pricer.simulate_terminal_prices()
+    V[i], _ = mc_pricer.european_call_price()
+
+# V[i]-V0
