@@ -12,7 +12,7 @@ params = MarketParams(S0, K, T, rf, sigma)
 
 df = {'num_iterations':[], 'price': [], 'std_error': []}
 
-for iterations in [1000, 10000, 100000, 1000000]:
+for iterations in [1000, 3000, 10000, 30000, 100000, 300000, 1000000]:
     mc_pricer = MonteCarloPricer(params, iterations, 101010)
     mc_pricer.simulate_price_paths(2)
     price, std_error = mc_pricer.european_call_price_from_paths()
@@ -23,7 +23,7 @@ for iterations in [1000, 10000, 100000, 1000000]:
     
 df = pd.DataFrame(df)
 
-# SE = sigma / sqrt(N) so log(SE) = log(sigma) - 0.5 * log(N)
+# SE = sigma / sqrt(N) so log(SE) = log(sigma) - 0.5 * log(N) (here, sigma is standard deviation of the payoffs)
 # so gradient will be -0.5
 # intercept is log(sigma)
 
@@ -39,7 +39,7 @@ payoff_std = np.exp(intercept)
 
 print(f'gradient: {gradient:.4f}')
 print(f'intercept: {intercept:.4f}')
-print(f'standard deviation of payoffs j(e^intercept): {payoff_std:.4f}')
+print(f'standard deviation of payoffs (e^intercept): {payoff_std:.4f}')
 plt.savefig('convergence.png')
 
 plt.show()
