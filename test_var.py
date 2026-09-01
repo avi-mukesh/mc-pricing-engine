@@ -32,8 +32,9 @@ for iterations in [1000, 10000, 100000]:
     end = perf_counter()
         
     pnl = V - V0
-    var99 = np.percentile(pnl, 1)
-    print(f"{iterations} iterations: ${-var99:.4f}")
+    var99 = -np.percentile(pnl, 1)
+    es99 = -pnl[pnl<=-var99].mean()
+    print(f"{iterations} iterations: VaR = ${var99:.4f}, ES = ${es99:.4f}")
     print(f"Time taken: {end-start:.4f}s")
     
 print()
@@ -45,6 +46,7 @@ for i in range(num_simulations):
 end = perf_counter()
 
 pnl = V - V0
-var99 = np.percentile(pnl, 1)
-print(f"Exact VaR using BS ${-var99:.4f}")
+var99 = -np.percentile(pnl, 1)
+es99 = -pnl[pnl<=-var99].mean()
+print(f"Using BS: VaR = ${var99:.4f}, ES = ${es99:.4f}")
 print(f"Time taken: {end-start:.4f}s")

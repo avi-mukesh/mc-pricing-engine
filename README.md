@@ -450,16 +450,17 @@ ES answers the question: "given that we are in the worst 1%, how much do we lose
 
 We simulate stock prices to 10-days in the future, and price a European call option at time $t=10/252$. We simulate a fixed number `num_simulations = 10000` of different stock paths, resulting in 10000 different future call prices $V(10/252)$. These call prices are worked out using Monte Carlo siulations. From these we subtract the call price at present $V(0)$ - worked out analytically using Black Scholes - giving an array of possible PnLs over this period. The estimated x% VaR is the (1-x)th percentile of this. I vary the number of Monte Carlo iterations from 1000, 10000, 100000. The following is a table of results showing that as we increase the number of iterations, the VaR obtained via Monte Carlo converges to VaR obtained using Black Scholes. 
 
-| Number of MC iterations | Estimated 99% 10-day VaR | Time taken (s) |
+| Number of MC iterations | Estimated 99% 10-day VaR | Estimated 99% 10-day ES | Time taken (s) |
 | -- | -- | -- |
-| 1000 | 5.4338 | 0.3239 |
-| 10000 | 5.1901 | 1.4686 |
-| 100000 | 5.0824 | 14.9436 |
+| 1000 | 5.4338 | 5.8561 | 0.3346 |
+| 10000 | 5.1901 | 5.6316 | 1.5335 |
+| 100000 | 5.0824 | 5.5317 | 15.7605 |
 
-Actual 99% 10-day VaR using BS: 5.0844. Time taken: 0.4197s.
+Using BS: Var = 5.0844, ES = 5.5351.
+Time taken: 0.4309s.
 
-For few iterations, the VaR obtained using MC overshoots the one estimated by BS. This is because each inner price is noisy. In scenario $i$, the option has true value $V_i$, but MC returns $\^{V_i} = V_i+\epsilon_i$ where $\epsilon_i$ is the MC error with mean 0 and standard deviation being the standard error of the inner price estimates. The standard error of the price estimates is the standard deviation of the individual payoffs divided by sqrt(number of iterations). From `test_convergence.py`, the payoff standard deviation is 13.9374. So these standard errors are $13.94/\sqrt{1000}\approx 0.44$, $13.94/\sqrt{10000}\approx 0.14$, $13.94/\sqrt{100000}\approx 0.044$ respectively. Therefore, the PnL array holds $\^{V_i}-V_0$, so the distribution you're taking a percentile of includes noise as well and has variance $\mathrm{Var}(\^{V_i}) = \mathrm{Var}(V_i)+\mathrm{SE_{\text{inner}}}^2$. This results in the spread of the observed PnLs being wider, so the e.g. 1% percentile will simply be higher. Increasing the number of inner `iterations` reduces the SE in the option price and we get closer to the actual VaR. 
+For few iterations, the VaR obtained using MC overshoots the one estimated by BS. This is because each inner price is noisy. In scenario $i$, the option has true value $V_i$, but MC returns $\^{V_i} = V_i+\epsilon_i$ where $\epsilon_i$ is the MC error with mean 0 and standard deviation being the standard error of the inner price estimates, $\mathrm{SE_{\mathrm{inner}}}$. The standard error of the price estimates is the standard deviation of the individual discounted payoffs divided by $\sqrt{\text{number of iterations}}$. From `test_convergence.py`, the discounted payoff standard deviation is 13.9374. So these standard errors are $13.94/\sqrt{1000}\approx 0.44$, $13.94/\sqrt{10000}\approx 0.14$, $13.94/\sqrt{100000}\approx 0.044$ respectively. Therefore, the PnL array holds $\^{V_i}-V_0$, so the distribution you're taking a percentile of includes noise as well and has variance $\mathrm{Var}(\^{V_i}) = \mathrm{Var}(V_i)+\mathrm{SE_{\mathrm{inner}}}^2$. This results in the spread of the observed PnLs being wider, so the e.g. 1% percentile will simply be higher. Increasing the number of inner `iterations` reduces $\mathrm{SE_{\mathrm{inner}}}$ and we get closer to the actual VaR. 
 
-The cost of using Monte Carlo here is `num_simulations x iterations`. This results in $10,000\times100,000=10^9$ price simulations. This results in a time of roughly 14 seconds, compared to just 0.4 seconds if using Black-Scholes. But as discussed earlier, not all exotics have a closed form to fallback on, so this nesting is unavoidable and cost is real.
+The cost of using Monte Carlo here is `num_simulations x iterations`. This results in $10,000\times100,000=10^9$ price simulations, which results in a time of roughly 14 seconds, compared to just 0.4 seconds if using Black-Scholes. But as discussed earlier, not all exotics have a closed form to fallback on, so this nesting is unavoidable and cost is real.
 
 ![Comparison of Monte Carlo vs Black Scholes for VaR](/var-mc-vs-bs.png)
