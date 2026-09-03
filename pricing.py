@@ -11,6 +11,7 @@ class MarketParams:
     
 class MonteCarloPricer:
     def __init__(self, params: MarketParams, iterations: int, rng_seed: int | None = None):
+        self.z = None
         self.S0 = params.S0
         self.K = params.K
         self.T = params.T
@@ -24,13 +25,13 @@ class MonteCarloPricer:
         
         self.rng = np.random.default_rng(rng_seed) if rng_seed is not None else np.random.default_rng()
         
+    def price_paths_from_shocks(self, dt, z):
+        return self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*z, axis=1))
+    
     def simulate_price_paths(self, n: int = 252):
-        if self.price_simulations is not None:
-            return
-        
         dt = self.T/n
         z = self.rng.normal(0, 1, (self.iterations, n))
-        self.price_simulations = self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*z, axis=1))
+        self.price_simulations = self.price_paths_from_shocks(dt, z)
 
     def simulate_terminal_prices(self):
         # simulate stock price at time T by simulating dS_t = \r_f*S_t*dt + \sigma * S_t * dW_t^Q
@@ -43,13 +44,10 @@ class MonteCarloPricer:
         self.terminal_prices = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * self.z)
 
     def simulate_antithetic_price_paths(self, n: int = 252):
-        if self.antithetic_price_simulations_pos is not None:
-            return
-        
         dt = self.T/n
         z = self.rng.normal(0, 1, (self.iterations//2, n))
-        self.antithetic_price_simulations_pos = self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*z, axis=1))
-        self.antithetic_price_simulations_neg = self.S0*np.exp(np.cumsum((self.rf-0.5*self.sigma**2)*dt+self.sigma*np.sqrt(dt)*-z, axis=1))
+        self.antithetic_price_simulations_pos = self.price_paths_from_shocks(dt, z)
+        self.antithetic_price_simulations_neg = self.price_paths_from_shocks(dt, -z)
     
     def price_result(self, payoffs):
         # discount to present time
@@ -61,7 +59,7 @@ class MonteCarloPricer:
         
         return price, standard_error
     
-    def european_call_price(self) -> float:
+    def european_call_price(self):
         self.european_call_payoffs = np.maximum(self.terminal_prices - self.K, 0)
         return self.price_result(self.european_call_payoffs)
 
@@ -71,24 +69,20 @@ class MonteCarloPricer:
 
     def european_call_price_from_paths(self):
         terminal = self.price_simulations[:, -1]
-        mc_call_prices = np.exp(-self.rf*self.T)*np.maximum(terminal - self.K, 0)
-        price = np.mean(mc_call_prices)
-        std_error = np.std(mc_call_prices) / np.sqrt(self.iterations)
-        return price, std_error
+        payoffs = np.maximum(terminal - self.K, 0)
+        return self.price_result(payoffs)
 
     def european_put_price_from_paths(self):
         terminal = self.price_simulations[:, -1]
-        mc_put_prices = np.exp(-self.rf*self.T)*np.maximum(self.K - terminal, 0)
-        price = np.mean(mc_put_prices)
-        std_error = np.std(mc_put_prices) / np.sqrt(self.iterations)
-        return price, std_error
+        payoffs = np.maximum(self.K-terminal, 0)
+        return self.price_result(payoffs)
     
     # payoff of an asian call is max(avg price from history - K, 0)
     # so we don't just care about terminal price like a european, we care about all prices up to it
     def arithmetic_asian_call_price(self):
         avg_price_by_path = self.price_simulations.mean(axis=1)
-        self.arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - self.K, 0)
-        return self.price_result(self.arithmetic_asian_call_payoffs)
+        arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - self.K, 0)
+        return self.price_result(arithmetic_asian_call_payoffs)
     
     def arithmetic_asian_put_price(self):
         avg_price_by_path = self.price_simulations.mean(axis=1)
@@ -97,8 +91,8 @@ class MonteCarloPricer:
     
     def geometric_asian_call_price(self):
         geometric_avg_price_by_path = np.sqrt(self.price_simulations[:,0]*self.price_simulations[:,1])
-        self.geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
-        return self.price_result(self.geometric_asian_call_payoffs)
+        geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
+        return self.price_result(geometric_asian_call_payoffs)
     
     def arithmetic_asian_call_price_with_control_variate(self, exact_geometric_price):
         avg_price_by_path = self.price_simulations.mean(axis=1)
@@ -119,9 +113,7 @@ class MonteCarloPricer:
     def arithmetic_asian_call_price_with_antithetic_variate(self):
         avg_price_by_path_pos = self.antithetic_price_simulations_pos.mean(axis=1)
         avg_price_by_path_neg = self.antithetic_price_simulations_neg.mean(axis=1)
-        
-        print('correlation beteen avg pos paths and avg neg paths {:.4f}'.format(np.corrcoef(avg_price_by_path_pos, avg_price_by_path_neg)[0,1]))
-        
+
         self.asian_payoffs_antithetic_pos = np.maximum(avg_price_by_path_pos - self.K, 0)
         self.asian_payoffs_antithetic_neg = np.maximum(avg_price_by_path_neg - self.K, 0)
         
