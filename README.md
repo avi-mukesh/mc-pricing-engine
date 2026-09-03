@@ -4,9 +4,9 @@ This is an options pricing engine in the works.
 
 I simulate price paths and estimate price of European options, arithmetic Asian options, geometric Asian options. Price of European options is validated against Black Scholes. I derive a similar closed form for geometric Asian options, and use that as a control variate as an anchor for the price of the arithmetic Asian, because that has no closed form. Initially, I try to use the two-step binomial model, but this introduces its own discretisation error.
 
-Currently I calculate one of the Greeks, $\Delta$, for a European call, using two methods: pathwise differentiation, and likelihood ratio, and compare them to the exact value predicted by Black Scholes.
+Currently I calculate one of the Greeks, $\Delta$, for a European call, using two methods: pathwise differentiation, and likelihood ratio, and compare them to the exact value predicted by Black Scholes. I also calculate Value at Risk (VaR) and Expected Shortfall (ES) using both Monte Carlo paths, and Black Schoeles, and compare the time taken for both.
 
-In future versions, I plan to migrate to AWS.
+I am now in the middle of containerising and deploying to the cloud.
 
 ## The maths
 Under risk-neutral measure, we model the stock as GBM $dS_t=r_fS_tdt+\sigma S_t dW_t$.
@@ -15,7 +15,7 @@ Where $W_t$ is a [Wiener Process](https://sites.me.ucsb.edu/~moehlis/APC591/tuto
 
 Applying [Itô's Lemma](https://math.nyu.edu/~goodman/teaching/StochCalc2018/notes/Lesson4.pdf) to $\ln S_t$ gives
 
-$d(\ln S_t) = (r_f-\frac{1}{2}\sigma^2)d_t+\sigma dW_t$. Integrating this gives
+$d(\ln S_t) = (r_f-\frac{1}{2}\sigma^2)dt+\sigma dW_t$. Integrating this gives
 
 $S_T=S_0\exp[(r_f-\frac{1}{2}\sigma^2)T+\sigma W_T]$
 
@@ -35,7 +35,7 @@ To make the translation, let $M$ be a two-point random variable, representing th
 
 which is $N\left(\left(r-\frac{1}{2}\sigma^2\right)dt, \sigma^2dt\right)$. So equate $\mathrm{Var}(M) = \sigma^2dt$ and simplify to get $$p(1-p)(\ln(1+u)-\ln(1+d))^2=\sigma^2dt$$
 
-Also set up an equation relating the mean. We equate the expected growth factor from one step of the binomial model to the expected growth factor over $dt$ in GBM. Expected growth factor from one step of the binomial model is $$p(1+u)+(1-p)(1+d)$$ and expected growth factor over $dt$ in GBM is $\mathbb{E}[\frac{S_{t+dt}}{S_t}]=\mathbb{E}\left[\exp\left(\left(r-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}z\right)\right]$ which can be calculated (noting that it is the [M.G.F](https://www.le.ac.uk/users/dsgp1/COURSES/MATHSTAT/6normgf.pdf) of a Normal distribution evaluated at $t=1$) to give $$\exp\left(\left(r+\frac{1}{2}\sigma^2\right)dt+\frac{1}{2}\sigma^2dt\right) = e^{rdt}$$ Equating the two expected growth factors gives $$p(1+u)+(1-p)(1+d)=e^{rdt}$$ So far we only have 2 equations but 3 unknowns ($u, d, p$) so we need to impose a third condition. We can choose this freely because it won't matter for convergence in the limit, so let's constrain $$(1+u)(1+d)=1 \implies \ln(1+u)=-\ln(1+d)$$ as this recombines the tree symmetrically. Substitute this into first equation to get $$4p(1-p)(\ln(1+u))^2=\sigma^2dt$$
+Also set up an equation relating the mean. We equate the expected growth factor from one step of the binomial model to the expected growth factor over $dt$ in GBM. Expected growth factor from one step of the binomial model is $$p(1+u)+(1-p)(1+d)$$ and expected growth factor over $dt$ in GBM is $\mathbb{E}[\frac{S_{t+dt}}{S_t}]=\mathbb{E}\left[\exp\left(\left(r-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}z\right)\right]$ which can be calculated (noting that it is the [M.G.F](https://www.le.ac.uk/users/dsgp1/COURSES/MATHSTAT/6normgf.pdf) of a Normal distribution evaluated at $t=1$) to give $$\exp\left(\left(r-\frac{1}{2}\sigma^2\right)dt+\frac{1}{2}\sigma^2dt\right) = e^{rdt}$$ Equating the two expected growth factors gives $$p(1+u)+(1-p)(1+d)=e^{rdt}$$ So far we only have 2 equations but 3 unknowns ($u, d, p$) so we need to impose a third condition. We can choose this freely because it won't matter for convergence in the limit, so let's constrain $$(1+u)(1+d)=1 \implies \ln(1+u)=-\ln(1+d)$$ as this recombines the tree symmetrically. Substitute this into first equation to get $$4p(1-p)(\ln(1+u))^2=\sigma^2dt$$
 
 CRR defines $\ln(1+u)=\sigma\sqrt{dt}$ so $u=e^{\sigma\sqrt{dt}}-1$, and $d=e^{-\sigma\sqrt{dt}}-1$. This means the variance equation is no longer solved exactly. The mean equation forces $p=\frac{1}{2}+O(\sqrt{dt})$ so $4p(1-p)=1-O(dt)$ and the variance is matched only up to an $O(dt^2)$ error per step. Over $N=T/dt$ steps these errors total $O(dt)$, which vanishes in the limit.
 
@@ -80,8 +80,8 @@ To evaluate this
 
 $$
 \begin{aligned}
-\mathbb{E}[(G-K)^+] &= \int_{\ln(K)}^\infty (e^x-K)\,\phi(x; \mu_G, \sigma_G^2)\,dx \\
-&= \int_{\ln(K)}^\infty e^x\phi(x; \mu_G, \sigma_G^2)\,dx \;-\; K\int_{\ln(K)}^\infty \phi(x; \mu_G, \sigma_G^2)\,dx
+\mathbb{E}[(G-K)^+] &= \int_{\ln(K)}^\infty (e^x-K)\phi(x; \mu_G, \sigma_G^2)dx \\
+&= \int_{\ln(K)}^\infty e^x\phi(x; \mu_G, \sigma_G^2)dx \;-\; K\int_{\ln(K)}^\infty \phi(x; \mu_G, \sigma_G^2)dx
 \end{aligned}
 $$
 
@@ -118,7 +118,7 @@ So
 
 $$
 \begin{aligned}
-\int_{\ln(K)}^\infty e^x\phi(x; \mu_G, \sigma_G^2)\,dx &= \int_{\ln(K)}^\infty \mathbb{E}[G]\phi(x; \mu_G+\sigma_G^2, \sigma_G^2)\,dx \\
+\int_{\ln(K)}^\infty e^x\phi(x; \mu_G, \sigma_G^2)dx &= \int_{\ln(K)}^\infty \mathbb{E}[G]\phi(x; \mu_G+\sigma_G^2, \sigma_G^2)dx \\
 &= \mathbb{E}[G]P[X'>\ln(K)] 
 \end{aligned}
 $$
@@ -142,7 +142,7 @@ $$e^{-rT}(\mathbb{E}[G]N(d_1)-KN(d_2))$$
 
 ### Control Variate
 
-A control variate needs two properties: its expectation must be known exactly, and it must be strongly correlated with the target. We know the price of the geometric option exactly (derived above) and since both the arithmetic Asian and geometric Asian use the same price path, their prices are correlated. This lets us build a lower variance estimator for the arithmetic Asian.
+A control variate needs two properties: its expectation must be known exactly, and it must be strongly correlated with the target. We know the price of the geometric Asian option exactly (derived above) and since both the arithmetic Asian and geometric Asian use the same price path, their prices are correlated. This lets us build a lower variance estimator for the arithmetic Asian.
 
 If $X$ and $Y$ are random variables representing payoffs of the arithmetic and geometric Asian, respectively, then let $Z = X - \beta(Y-\mathbb{E}[Y])$. Then this is an unbiased estimator (as $\mathbb{E}[Z] = \mathbb{E}[X]$) for any $\beta$. We choose $\beta$ that minimises $\mathrm{Var}(Z) = \mathrm{Var}(X)-2\beta \mathrm{Cov}(X,Y)+\beta^2\mathrm{Var}(Y)$. Minimising gives $\beta=\frac{\mathrm{Cov}(X,Y)}{\mathrm{Var}(Y)}$, which gives $\mathrm{Var}(Z) = \mathrm{Var}(X)(1-\rho^2)$. The standard error from the Monte Carlo estimate for Asian price was 0.0359. In the code, we measure $\rho=0.9996$, giving $1-\rho^2 \approx 0.0008$. So the standard error in the estimate from the control variate will be $\approx \sqrt{0.0008} \approx 0.0283 \approx \frac{1}{35}$ times the standard error, which it is - the standard error in this estimate is $\approx 0.0010$. The price of the arithmetic Asian using the Monte Carlo simulation gives 8.107, whereas the price using the control variate gives 8.112. We have $\bar{X} - \bar{Z} = \beta(\bar{Y}-\mathbb{E}[Y])$, so the two estimators differ by exactly $\beta$ times the control's own sampling error.
 
@@ -198,19 +198,19 @@ We measure $\rho=-0.5173$, predicting $SE_{antithetic} = 0.0356\sqrt{1-0.5173} \
 
 To simulate a full path (rather than just the terminal price), the SDE is discretised into `n` steps of size $dt = T/n$:
 
-$$S_t = S_{t-1}\exp\left(\left(r_f-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}\,z_{t-1}\right)$$
+$$S_t = S_{t-1}\exp\left(\left(r_f-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}z_{t-1}\right)$$
 
 Taking logs and unrolling the recursion:
 
 $$
 \begin{aligned}
-\ln S_t &= \ln S_{t-1} + \left(r_f-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}\,z_{t-1} \\
+\ln S_t &= \ln S_{t-1} + \left(r_f-\frac{1}{2}\sigma^2\right)dt+\sigma\sqrt{dt}z_{t-1} \\
 &= \dots \\
 &= \ln S_0 + \left(r_f-\frac{1}{2}\sigma^2\right)T+\sigma\sqrt{dt}(z_0+\dots+z_{t-1})
 \end{aligned}
 $$
 
-Since the sum of independent Normals is Normal, with variance equal to the sum of the variances, summing all the $\sqrt{dt}\,z_t$ terms gives $\sqrt{T}z$. This recovers the same closed form used for the terminal price:
+Since the sum of independent Normals is Normal, with variance equal to the sum of the variances, summing all the $\sqrt{dt}z_t$ terms gives $\sqrt{T}z$. This recovers the same closed form used for the terminal price:
 
 $$S_t=S_0\exp\left(\left(r_f-\frac{1}{2}\sigma^2\right)T+\sigma\sqrt{T}z\right)$$
 
@@ -283,7 +283,7 @@ Ke^{-r_fT}N'(d_2) &= Ke^{-r_fT}N'(d_1-\sigma\sqrt{T}) \\
 &= Ke^{-r_fT}\frac{1}{\sqrt{2\pi}}e^{-\frac{1}{2}(d_1-\sigma\sqrt{T})^2} \\
 &= \frac{K}{\sqrt{2\pi}}e^{-\frac{1}{2}d_1^2+d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT} \\
 &= S_0\frac{1}{\sqrt{2\pi}}e^{-\frac{1}{2}d_1^2}\cdot \frac{K}{S_0}e^{d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT} \\
-&= S_0N(d_1)\exp\left(\ln\left(\frac{K}{S_0}\right)+d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT\right)
+&= S_0N'(d_1)\exp\left(\ln\left(\frac{K}{S_0}\right)+d_1\sigma\sqrt{T}-\frac{1}{2}\sigma^2T-r_fT\right)
 \end{aligned}
 $$
 
@@ -370,7 +370,7 @@ The biggest downside of this method is that for a digital payoff, $\frac{\partia
 
 Letting $X=\ln(S_T)$, so that $X$ is Normal with mean $\mu=\ln(S_0)+\left(r-\frac{1}{2}\sigma^2\right)T$ and variance $\nu=\sigma^2 T$ the expectation is 
 
-$$\int_{\ln(K)}^{\infty}e^x\phi(x;\mu,\nu)\,dx$$
+$$\int_{\ln(K)}^{\infty}e^x\phi(x;\mu,\nu)dx$$
 
 This is exactly the integral we evaluated in the section Geometric Asian, just with different parameters. The result is
 
@@ -392,17 +392,17 @@ This shows that the pathwise estimator is not approximating something separate f
 
 With pathwise, we differentiate the payoff, and leave the density alone. Here, we leave the payoff alone, and differentiate the density
 
-$$C=e^{-rT}\int \text{payoff}(x)f(x)\,dx$$
+$$C=e^{-rT}\int \text{payoff}(x)f(x)dx$$
 
 where $f$ is the density of $\ln(S_T)$.
 
 Differentiating under the integral gives 
 
-$$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f}{\partial S_0}\,dx$$
+$$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f}{\partial S_0}dx$$
 
 The trick is to multiply and divide the integrand by $f$ to get
 
-$$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f/\partial S_0}{f}f(x)\,dx = e^{-rT}\,\mathbb{E}[\text{payoff}(x)\frac{\partial \ln(f)}{\partial S_0}]$$
+$$\Delta = e^{-rT}\int \text{payoff}(x)\frac{\partial f/\partial S_0}{f}f(x)dx = e^{-rT}\mathbb{E}[\text{payoff}(x)\frac{\partial \ln(f)}{\partial S_0}]$$
 
 For Normal with mean $\mu$ and variance $\nu$,
 
