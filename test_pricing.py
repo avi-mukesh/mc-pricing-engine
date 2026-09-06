@@ -52,11 +52,11 @@ assert(abs(mc_european_call_from_paths - bs_european_call) < 2 * std_error)
 print('=====testing asian call price: MC vs 2-step binomial model=====')
 # attempting to validate asian call option price from MC against 2-step binomial model
 # but it doesn't work because n=2 is too small for the tree itself to be accurate
-mc_asian_call, std_error = mc_pricer.arithmetic_asian_call_price()
+mc_asian_call, std_error_mc_asian_call = mc_pricer.arithmetic_asian_call_price()
 binomial_asian_call = binomial_arithmetic_asian_call_price(params)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
 print('binomial model (n=2) asian call price {:.3f} (not a good anchor, too high here)'.format(binomial_asian_call))
-print('standard error {:.4f}\n'.format(std_error))
+print('standard error {:.4f}\n'.format(std_error_mc_asian_call))
 
 
 print('=====testing 2-step binomial model accuracy: european call price=====')
@@ -92,7 +92,9 @@ mc_pricer.simulate_antithetic_price_paths(2)
 mc_asian_call_antithetic_variate, std_error = mc_pricer.arithmetic_asian_call_price_with_antithetic_variate()
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
 print('arithmetic asian call price with antithetic variate {:.3f}'.format(mc_asian_call_antithetic_variate))
-print('standard error {:.4f}'.format(std_error))
+print('standard error in antithetic estimate {:.4f}'.format(std_error))
+print('standard error in mc estimate {:.4f}'.format(std_error_mc_asian_call))
+print('standard error overall {:.4f}'.format(np.sqrt(std_error**2 + std_error_mc_asian_call**2)))
 rho = np.corrcoef(mc_pricer.asian_payoffs_antithetic_pos, mc_pricer.asian_payoffs_antithetic_neg)[0, 1]
 print('correlation between positive and negative payoffs (rho) {:.4f}'.format(rho))
-assert(abs(mc_asian_call - mc_asian_call_antithetic_variate) < 2 * std_error)
+assert(abs(mc_asian_call - mc_asian_call_antithetic_variate) < 2 * np.sqrt(std_error**2 + std_error_mc_asian_call**2))
