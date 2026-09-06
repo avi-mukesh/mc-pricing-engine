@@ -18,10 +18,6 @@ class MonteCarloPricer:
         self.rf = params.rf
         self.sigma = params.sigma
         self.iterations = iterations
-        self.terminal_prices = None
-        self.price_simulations = None
-        self.antithetic_price_simulations_pos = None
-        self.antithetic_price_simulations_neg = None
         
         self.rng = np.random.default_rng(rng_seed) if rng_seed is not None else np.random.default_rng()
         
@@ -31,20 +27,22 @@ class MonteCarloPricer:
     def simulate_price_paths(self, n: int = 252):
         dt = self.T/n
         z = self.rng.normal(0, 1, (self.iterations, n))
-        self.price_simulations = self.price_paths_from_shocks(dt, z)
+        return self.price_paths_from_shocks(dt, z)
 
     def simulate_terminal_prices(self):
         # simulate stock price at time T by simulating dS_t = \r_f*S_t*dt + \sigma * S_t * dW_t^Q
         # notice we are using risk neutral measure and using r_f instead of mu now
         # expected growth of asset = risk-free rate - the entire foundation of risk-free pricing
-        self.z = self.rng.normal(0, 1, self.iterations)
-        self.terminal_prices = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * self.z)
+        z = self.rng.normal(0, 1, self.iterations)
+        terminal = self.S0 * np.exp((self.rf - 0.5 * self.sigma ** 2)*self.T + self.sigma * np.sqrt(self.T) * z)
+        return terminal, z
 
     def simulate_antithetic_price_paths(self, n: int = 252):
         dt = self.T/n
         z = self.rng.normal(0, 1, (self.iterations//2, n))
-        self.antithetic_price_simulations_pos = self.price_paths_from_shocks(dt, z)
-        self.antithetic_price_simulations_neg = self.price_paths_from_shocks(dt, -z)
+        paths_pos = self.price_paths_from_shocks(dt, z)
+        paths_neg = self.price_paths_from_shocks(dt, -z)
+        return paths_pos, paths_neg
     
     def price_result(self, payoffs):
         # discount to present time
@@ -56,50 +54,40 @@ class MonteCarloPricer:
         
         return price, standard_error
     
-    def european_call_price(self):
-        self.european_call_payoffs = np.maximum(self.terminal_prices - self.K, 0)
-        return self.price_result(self.european_call_payoffs)
-
-    def european_put_price(self):
-        payoffs = np.maximum(self.K - self.terminal_prices, 0)
-        return self.price_result(payoffs)
-
-    def european_call_price_from_paths(self):
-        terminal = self.price_simulations[:, -1]
+    def european_call_price(self, terminal):
         payoffs = np.maximum(terminal - self.K, 0)
         return self.price_result(payoffs)
 
-    def european_put_price_from_paths(self):
-        terminal = self.price_simulations[:, -1]
-        payoffs = np.maximum(self.K-terminal, 0)
+    def european_put_price(self, terminal):
+        payoffs = np.maximum(self.K - terminal, 0)
         return self.price_result(payoffs)
     
     # payoff of an asian call is max(avg price from history - K, 0)
     # so we don't just care about terminal price like a european, we care about all prices up to it
-    def arithmetic_asian_call_price(self):
-        avg_price_by_path = self.price_simulations.mean(axis=1)
+    def arithmetic_asian_call_price(self, paths):
+        avg_price_by_path = paths.mean(axis=1)
+        payoffs = np.maximum(avg_price_by_path - self.K, 0)
+        return self.price_result(payoffs)
+    
+    def arithmetic_asian_put_price(self, paths):
+        avg_price_by_path = paths.mean(axis=1)
+        payoffs = np.maximum(self.K - avg_price_by_path, 0)
+        return self.price_result(payoffs)
+    
+    def geometric_asian_call_price(self, paths):
+        geometric_avg_price_by_path = np.sqrt(paths[:,0]*paths[:,1])
+        payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
+        return self.price_result(payoffs)
+    
+    def arithmetic_asian_call_price_with_control_variate(self, paths, exact_geometric_price):
+        avg_price_by_path = paths.mean(axis=1)
         arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - self.K, 0)
-        return self.price_result(arithmetic_asian_call_payoffs)
-    
-    def arithmetic_asian_put_price(self):
-        avg_price_by_path = self.price_simulations.mean(axis=1)
-        asian_payoffs = np.maximum(self.K - avg_price_by_path, 0)
-        return self.price_result(asian_payoffs)
-    
-    def geometric_asian_call_price(self):
-        geometric_avg_price_by_path = np.sqrt(self.price_simulations[:,0]*self.price_simulations[:,1])
+        
+        geometric_avg_price_by_path = np.sqrt(paths[:,0]*paths[:,1])
         geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
-        return self.price_result(geometric_asian_call_payoffs)
-    
-    def arithmetic_asian_call_price_with_control_variate(self, exact_geometric_price):
-        avg_price_by_path = self.price_simulations.mean(axis=1)
-        self.arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - self.K, 0)
         
-        geometric_avg_price_by_path = np.sqrt(self.price_simulations[:,0]*self.price_simulations[:,1])
-        self.geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-self.K, 0)
-        
-        X = self.arithmetic_asian_call_payoffs
-        Y = self.geometric_asian_call_payoffs
+        X = arithmetic_asian_call_payoffs
+        Y = geometric_asian_call_payoffs
         
         beta = np.cov(X, Y)[0,1] / np.var(Y)
         Z = X - beta * (Y - exact_geometric_price*np.exp(self.rf*self.T))
@@ -107,14 +95,14 @@ class MonteCarloPricer:
         price, std_error = self.price_result(Z)
         return price, std_error, beta
     
-    def arithmetic_asian_call_price_with_antithetic_variate(self):
-        avg_price_by_path_pos = self.antithetic_price_simulations_pos.mean(axis=1)
-        avg_price_by_path_neg = self.antithetic_price_simulations_neg.mean(axis=1)
+    def arithmetic_asian_call_price_with_antithetic_variate(self, paths_pos, paths_neg):
+        avg_price_by_path_pos = paths_pos.mean(axis=1)
+        avg_price_by_path_neg = paths_neg.mean(axis=1)
         
-        self.asian_payoffs_antithetic_pos = np.maximum(avg_price_by_path_pos - self.K, 0)
-        self.asian_payoffs_antithetic_neg = np.maximum(avg_price_by_path_neg - self.K, 0)
+        payoffs_pos = np.maximum(avg_price_by_path_pos - self.K, 0)
+        payoffs_neg = np.maximum(avg_price_by_path_neg - self.K, 0)
         
-        payoffs_avg = 0.5*(self.asian_payoffs_antithetic_pos+self.asian_payoffs_antithetic_neg)
+        payoffs_avg = 0.5*(payoffs_pos+payoffs_neg)
         
         discounted_payoffs = payoffs_avg * np.exp(-self.rf * self.T)
 
@@ -124,17 +112,17 @@ class MonteCarloPricer:
         return price, standard_error
     
     def delta_using_pathwise_differentiation(self):
-        self.simulate_price_paths(2)
-        ST = self.price_simulations[:,-1]
+        paths = self.simulate_price_paths(2)
+        ST = paths[:,-1]
         pathwise_samples = np.exp(-self.rf*self.T)*np.where(ST>self.K, ST/self.S0, 0)
         pathwise_delta = np.mean(pathwise_samples)
         std_error = np.std(pathwise_samples) / np.sqrt(self.iterations)
         return pathwise_delta, std_error
     
     def delta_using_likelihood_ratio(self):
-        self.simulate_terminal_prices()
-        self.european_call_price()
-        likelihood_ratio_samples = (np.exp(-self.rf*self.T)*self.european_call_payoffs*self.z) / (self.S0 * self.sigma * np.sqrt(self.T))
+        terminal, z = self.simulate_terminal_prices()
+        payoffs = np.maximum(terminal - self.K, 0)
+        likelihood_ratio_samples = (np.exp(-self.rf*self.T)*payoffs*z) / (self.S0 * self.sigma * np.sqrt(self.T))
         likelihood_ratio_delta = np.mean(likelihood_ratio_samples)
         std_error = np.std(likelihood_ratio_samples) / np.sqrt(self.iterations)
         return likelihood_ratio_delta, std_error

@@ -14,8 +14,8 @@ df = {'num_iterations':[], 'price': [], 'std_error': []}
 
 for iterations in [1000, 3000, 10000, 30000, 100000, 300000, 1000000]:
     mc_pricer = MonteCarloPricer(params, iterations, 101010)
-    mc_pricer.simulate_price_paths(2)
-    price, std_error = mc_pricer.european_call_price_from_paths()
+    paths = mc_pricer.simulate_price_paths(2)
+    price, std_error = mc_pricer.european_call_price(paths[:, -1])
     
     df['num_iterations'].append(iterations)
     df['price'].append(price)

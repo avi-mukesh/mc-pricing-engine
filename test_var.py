@@ -27,8 +27,8 @@ for iterations in [1000, 10000, 100000]:
         params = MarketParams(S_10d[i], K, T-10/252, rf, sigma)
         # using CRN here, as it reduces noise in the pnl differencess
         mc_pricer = MonteCarloPricer(params, iterations, 10101010)
-        mc_pricer.simulate_terminal_prices()
-        V[i], _ = mc_pricer.european_call_price()
+        terminal, _ = mc_pricer.simulate_terminal_prices()
+        V[i], _ = mc_pricer.european_call_price(terminal)
     end = perf_counter()
         
     pnl = V - V0

@@ -10,10 +10,10 @@ iterations = 100000
 params = MarketParams(S0, K, T, rf, sigma)
 
 mc_pricer = MonteCarloPricer(params, iterations, 10101010)
-mc_pricer.simulate_terminal_prices()
+terminal, _ = mc_pricer.simulate_terminal_prices()
 
 print('=====testing european call price: MC vs Black-Scholes=====')
-mc_european_call, std_error = mc_pricer.european_call_price()
+mc_european_call, std_error = mc_pricer.european_call_price(terminal)
 bs_european_call = bs_european_call_price(params)
 print('mc european call price {:.3f}'.format(mc_european_call))
 print('bs european call price {:.3f}'.format(bs_european_call))
@@ -21,7 +21,7 @@ print('standard error {:.4f}\n'.format(std_error))
 assert(abs(mc_european_call - bs_european_call) < 2 * std_error) # will fail about 5% of the time
 
 print('=====testing european put price: MC vs Black-Scholes=====')
-mc_european_put, std_error = mc_pricer.european_put_price()
+mc_european_put, std_error = mc_pricer.european_put_price(terminal)
 bs_european_put = bs_european_put_price(params)
 print('mc european put price {:.3f}'.format(mc_european_put))
 print('bs european put price {:.3f}'.format(bs_european_put))
@@ -34,14 +34,14 @@ assert(abs(bs_european_call - bs_european_put - S0 + K * np.exp(-rf * T)) < 1e-1
 
 print('=====testing put-call parity: MC (approximate)=====')
 # put-call parity holds for MC (not exact, but good)
-discounted_terminal_prices = np.exp(-rf * T) * mc_pricer.terminal_prices
+discounted_terminal_prices = np.exp(-rf * T) * terminal
 std_error_pc_parity = np.std(discounted_terminal_prices) / np.sqrt(mc_pricer.iterations)
 assert(abs(mc_european_call - mc_european_put - S0 + K * np.exp(-rf * T)) < 2 * std_error_pc_parity)
 
 print('=====testing european call price from full path simulation: MC vs Black-Scholes=====')
 # ensuring that the method that simulated the full price paths (instead of just the terminal prices) is valid
-mc_pricer.simulate_price_paths(2)
-mc_european_call_from_paths, std_error = mc_pricer.european_call_price_from_paths()
+paths = mc_pricer.simulate_price_paths(2)
+mc_european_call_from_paths, std_error = mc_pricer.european_call_price(paths[:, -1])
 
 print('mc european call price (full path simulation) {:.3f}'.format(mc_european_call_from_paths))
 print('bs european call price {:.3f}'.format(bs_european_call))
@@ -52,7 +52,7 @@ assert(abs(mc_european_call_from_paths - bs_european_call) < 2 * std_error)
 print('=====testing asian call price: MC vs 2-step binomial model=====')
 # attempting to validate asian call option price from MC against 2-step binomial model
 # but it doesn't work because n=2 is too small for the tree itself to be accurate
-mc_asian_call, std_error_mc_asian_call = mc_pricer.arithmetic_asian_call_price()
+mc_asian_call, std_error_mc_asian_call = mc_pricer.arithmetic_asian_call_price(paths)
 binomial_asian_call = binomial_arithmetic_asian_call_price(params)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
 print('binomial model (n=2) asian call price {:.3f} (not a good anchor, too high here)'.format(binomial_asian_call))
@@ -68,7 +68,7 @@ print('bs european call price {:.3f}\n'.format(bs_european_call))
 
 
 print('=====testing geometric asian call price=====')
-mc_geometric_asian_call, std_error_geometric = mc_pricer.geometric_asian_call_price()
+mc_geometric_asian_call, std_error_geometric = mc_pricer.geometric_asian_call_price(paths)
 bs_geometric_asian_call = bs_geometric_asian_call_price(params)
 print('mc (n=2) geometric asian call price {:.3f}'.format(mc_geometric_asian_call))
 print('bs geometric asian call price {:.3f}'.format(bs_geometric_asian_call))
@@ -77,24 +77,36 @@ assert(abs(mc_geometric_asian_call - bs_geometric_asian_call) < 2 * std_error_ge
 
 
 print('=====testing arithmetic asian call price: MC vs control variate')
-mc_asian_call_control_variate, std_error, beta = mc_pricer.arithmetic_asian_call_price_with_control_variate(bs_geometric_asian_call)
+mc_asian_call_control_variate, std_error, beta = mc_pricer.arithmetic_asian_call_price_with_control_variate(paths, bs_geometric_asian_call)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
 print('arithmetic asian call price with control variate {:.3f}'.format(mc_asian_call_control_variate))
 print('standard error {:.4f}'.format(std_error))
 print('beta {:.4f}'.format(beta))
-rho = np.corrcoef(mc_pricer.arithmetic_asian_call_payoffs, mc_pricer.geometric_asian_call_payoffs)[0, 1]
+
+avg_price_by_path = paths.mean(axis=1)
+arithmetic_asian_call_payoffs = np.maximum(avg_price_by_path - mc_pricer.K, 0)
+geometric_avg_price_by_path = np.sqrt(paths[:,0]*paths[:,1])
+geometric_asian_call_payoffs = np.maximum(geometric_avg_price_by_path-mc_pricer.K, 0)
+
+rho = np.corrcoef(arithmetic_asian_call_payoffs, geometric_asian_call_payoffs)[0, 1]
 print('correlation between arithmetic and geometric payoffs (rho) {:.4f}\n'.format(rho))
 assert(abs(mc_asian_call - mc_asian_call_control_variate) < 2 * beta * std_error_geometric)
 
 
 print("=====testing arithmetic asian call price: MC vs antithetic variate")
-mc_pricer.simulate_antithetic_price_paths(2)
-mc_asian_call_antithetic_variate, std_error = mc_pricer.arithmetic_asian_call_price_with_antithetic_variate()
+paths_pos, paths_neg = mc_pricer.simulate_antithetic_price_paths(2)
+mc_asian_call_antithetic_variate, std_error = mc_pricer.arithmetic_asian_call_price_with_antithetic_variate(paths_pos, paths_neg)
 print('mc (n=2) asian call price {:.3f}'.format(mc_asian_call))
 print('arithmetic asian call price with antithetic variate {:.3f}'.format(mc_asian_call_antithetic_variate))
 print('standard error in antithetic estimate {:.4f}'.format(std_error))
 print('standard error in mc estimate {:.4f}'.format(std_error_mc_asian_call))
 print('standard error overall {:.4f}'.format(np.sqrt(std_error**2 + std_error_mc_asian_call**2)))
-rho = np.corrcoef(mc_pricer.asian_payoffs_antithetic_pos, mc_pricer.asian_payoffs_antithetic_neg)[0, 1]
+
+avg_price_by_path_pos = paths_pos.mean(axis=1)
+avg_price_by_path_neg = paths_neg.mean(axis=1)
+asian_payoffs_antithetic_pos = np.maximum(avg_price_by_path_pos - mc_pricer.K, 0)
+asian_payoffs_antithetic_neg = np.maximum(avg_price_by_path_neg - mc_pricer.K, 0)
+
+rho = np.corrcoef(asian_payoffs_antithetic_pos, asian_payoffs_antithetic_neg)[0, 1]
 print('correlation between positive and negative payoffs (rho) {:.4f}'.format(rho))
 assert(abs(mc_asian_call - mc_asian_call_antithetic_variate) < 2 * np.sqrt(std_error**2 + std_error_mc_asian_call**2))

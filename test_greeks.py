@@ -14,13 +14,13 @@ print(f'exact Δ = N(d_1) = {delta:.4f}\n')
 def fd_delta(h, seed_base, seed_bumped, print_details):
     params = MarketParams(S0, K, T, rf, sigma)
     mc_pricer_base = MonteCarloPricer(params, iterations, seed_base)
-    mc_pricer_base.simulate_price_paths(2)
-    c, _ = mc_pricer_base.european_call_price_from_paths()
+    paths = mc_pricer_base.simulate_price_paths(2)
+    c, _ = mc_pricer_base.european_call_price(paths[:, -1])
 
     params_bumped = MarketParams(S0+h, K, T, rf, sigma)
     mc_pricer_bumped = MonteCarloPricer(params_bumped, iterations, seed_bumped)
-    mc_pricer_bumped.simulate_price_paths(2)
-    c_h, _ = mc_pricer_bumped.european_call_price_from_paths()
+    paths = mc_pricer_bumped.simulate_price_paths(2)
+    c_h, _ = mc_pricer_bumped.european_call_price(paths[:, -1])
     delta_approx = (c_h - c) / h
     
     if print_details:
