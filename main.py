@@ -1,5 +1,6 @@
 import os
 from pricing import *
+import boto3
 
 S0 = float(os.environ.get("S0", 100))
 K = float(os.environ.get("K", 100))
@@ -34,6 +35,15 @@ for i in range(num_simulations):
 pnl = V - V0
 
 output_dir = os.environ.get("output_dir", ".")
-np.save(f'{output_dir}/pnl_{worker_index}.npy', pnl)
+local_path = f'{output_dir}/pnl_{worker_index}.npy'
+np.save(local_path, pnl)
 
 print(f'PnL array of length {len(pnl)} written to pnl_{worker_index}.npy')
+
+bucket = os.environ.get('s3_bucket')
+run_id = os.environ.get('run_id', 'local')
+
+if bucket:
+    key = f"runs/{run_id}/pnl_{worker_index}.npy"
+    boto3.client("s3").upload_file(local_path, bucket, key)
+    print(f'uploaded to s3://{bucket}/{key}')
