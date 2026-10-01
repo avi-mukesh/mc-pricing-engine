@@ -14,7 +14,7 @@ V0 = bs_european_call_price(params)
 
 num_simulations = int(os.environ.get("num_simulations", 20))
 num_workers = int(os.environ.get("num_workers", 1))
-worker_index = int(os.environ.get("worker_index", 0))
+worker_index = int(os.environ.get("AWS_BATCH_JOB_ARRAY_INDEX", os.environ.get("worker_index", 0)))
 
 root = np.random.SeedSequence(12345)
 child = root.spawn(num_workers)[worker_index]
