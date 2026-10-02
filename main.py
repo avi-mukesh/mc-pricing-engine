@@ -1,6 +1,7 @@
 import os
 from pricing import *
 import boto3
+import json
 
 S0 = float(os.environ.get("S0", 100))
 K = float(os.environ.get("K", 100))
@@ -51,8 +52,21 @@ bucket = os.environ.get('s3_bucket')
 run_id = os.environ.get('run_id', 'local')
 
 if bucket:
-    key = f"runs/{run_id}/pnl_{worker_index}.npy"
+    key = f"runs/{run_id}/pnl/pnl_{worker_index}.npy"
     profile = os.environ.get("aws_profile")
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
-    session.client("s3").upload_file(local_path, bucket, key)
+    s3 = session.client("s3")
+    s3.upload_file(local_path, bucket, key)
     print(f'uploaded to s3://{bucket}/{key}')
+    
+    if worker_index == 0:
+        obj = {
+            "S0": S0,
+            "K": K,
+            "T": T,
+            "t": t,
+            "r": rf,
+            "sigma": sigma,
+            "type": "European Call"
+        }
+        s3.put_object(Bucket=bucket, Key=f"runs/{run_id}/inputs/params.json", Body=json.dumps(obj))

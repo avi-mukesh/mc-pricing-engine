@@ -12,7 +12,7 @@ bucket = os.environ.get('s3_bucket', 'avi-mc-pricer-results')
 num_workers = os.environ['num_workers']
 run_id = os.environ['run_id']
 
-key = f"runs/{run_id}/"
+key = f"runs/{run_id}/pnl/"
 response = s3.list_objects_v2(Bucket=bucket, Prefix=key)
 
 arrays = []
@@ -42,6 +42,5 @@ summary = {
     "var_99": float(-var99),
     "es_99": float(-es99)
 }
-# todo: store the market params as well somehow i.e. S0, K, ...
 
 s3.put_object(Bucket=bucket, Key=f"runs/{run_id}/results/summary.json", Body=json.dumps(summary))
