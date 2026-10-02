@@ -12,9 +12,15 @@ sigma = float(os.environ.get("sigma", 0.2))
 params = MarketParams(S0, K, T, rf, sigma)
 V0 = bs_european_call_price(params)
 
-num_simulations = int(os.environ.get("num_simulations", 20))
+worker_index = int(os.environ.get("AWS_BATCH_JOB_ARRAY_INDEX", os.environ.get("worker_index", 0))) 
 num_workers = int(os.environ.get("num_workers", 1))
-worker_index = int(os.environ.get("AWS_BATCH_JOB_ARRAY_INDEX", os.environ.get("worker_index", 0)))
+num_simulations = int(os.environ.get("num_simulations", 200))
+iterations = int(os.environ.get("iterations", 1000))
+
+# print(f'num_simulations = {num_simulations}')
+# print(f'num_workers = {num_workers}')
+# print(f'worker_index = {worker_index}')
+# print(f'iterations = {iterations}')
 
 root = np.random.SeedSequence(12345)
 child = root.spawn(num_workers)[worker_index]
@@ -24,11 +30,12 @@ z = rng.normal(0, 1, num_simulations)
 
 S_t = S0 * np.exp((rf - 0.5 * sigma ** 2)*t + sigma * np.sqrt(t) * z)
 V = [0]*num_simulations
-iterations = 1000
 
+inner_seeds = child.spawn(num_simulations)
 for i in range(num_simulations):    
     params = MarketParams(S_t[i], K, T-t, rf, sigma)
-    mc_pricer = MonteCarloPricer(params, iterations, worker_index)
+    mc_pricer = MonteCarloPricer(params, iterations)
+    mc_pricer.rng = np.random.default_rng(inner_seeds[i])
     terminal, _ = mc_pricer.simulate_terminal_prices()
     V[i], _ = mc_pricer.european_call_price(terminal)
 

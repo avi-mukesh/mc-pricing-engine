@@ -464,3 +464,46 @@ Time taken: 0.4309s.
 For few iterations, the VaR obtained using MC overshoots the one estimated by BS. This is because each inner price is noisy. In scenario $i$, the option has true value $V_i$, but MC returns $\hat{V}_i = V_i+\epsilon_i$ where $\epsilon_i$ is the MC error with mean 0 and standard deviation being the standard error of the inner price estimates, $\mathrm{SE_{\mathrm{inner}}}$. The standard error of the price estimates is the standard deviation of the individual discounted payoffs divided by $\sqrt{\text{number of iterations}}$. From `test_convergence.py`, the discounted payoff standard deviation is 13.9374. So these standard errors are $13.94/\sqrt{1000}\approx 0.44$, $13.94/\sqrt{10000}\approx 0.14$, $13.94/\sqrt{100000}\approx 0.044$ respectively. Therefore, the PnL array holds $\hat{V}_i-V_0$, so the distribution you're taking a percentile of includes noise as well and has variance $\mathrm{Var}(\hat{V}_i) = \mathrm{Var}(V_i)+\mathrm{SE_{\mathrm{inner}}}^2$. This results in the spread of the observed PnLs being wider, so the e.g. 1% percentile will simply be higher. Increasing the number of inner `iterations` reduces $\mathrm{SE_{\mathrm{inner}}}$ and we get closer to the actual VaR. The expected shortfall also converges in the same way for the same reason, since it is an average over the same inflated tail. For 100000 iterations, the VaR is actually lower than the value obtained using BS. This is explained by the outer sampling error. We have 10,000 scenarios, 1% of which gives 100 observations.
 
 The cost of using Monte Carlo here is `num_simulations x iterations`. This results in $10,000\times100,000=10^9$ price simulations, which results in a time of roughly 15 seconds, compared to just 0.4 seconds if using Black-Scholes. But as discussed earlier, not all exotics have a closed form to fall back on, so this nesting is unavoidable and cost is real.
+
+# Deploying to AWS
+
+I use AWS Batch to split the simulation workload across multiple workers. Each worker runs 10000 stock price simulations into the future (t=1/12), calculates the price of a European call at that time, and subtracts the current price of the option (calculated using Black Scholes), resulting in a pnl array of size 10000. Each worker receives its own `worker_index` which is provided by `AWS_BATCH_JOB_ARRAY_INDEX`, and stores its section of pnl into S3 under `runs/{run_id}/pnl_{worker_index}.npy`.
+
+After making changes to `main.py`, run `./docker-build-and-deploy.sh` to create a new image and push it to ECR.
+
+To submit a batch job, run `./submit-job.sh`.
+
+`aggregator.py` takes the S3 bucket and the `run_id` to collate the results into one pnl array before getting the VaR. 
+
+## IAM Roles
+
+The batch job requires two roles. An execution role with built-in policy `AmazonECSTaskExecutionRolePolicy` that pulls the image from ECR and writes logs. And a job role with policy `mc-pricer-s3-access` which writes the pnl arrays results to S3. The policy JSON for the latter is as follows
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::avi-mc-pricer-results",
+                "arn:aws:s3:::avi-mc-pricer-results/*"
+            ]
+        }
+    ]
+}
+```
+
+## Seeding
+
+Have one root seed, spawn individual children per worker, and also per scenario for the inner pricing. This ensures independent non-overlapping streams per worker. I encountered a bug when using the same fixed seed for the inner pricing each time `MonteCarloPricer(params, iterations, worker_index)`. This means each scenario's Monte Carlo error was identical rather than independent. Independent errors average away across scenarios, but correlated ones don't. This resulted in the P&L array containing a bias, with all elements shifted by the same amount. Analytically, since the discounted option price is a martingale i.e. $\mathbb{E}[V_t] = V_0e^{rt}$, we expect $V_{1/12}$ to be approximately $10.451 \times e^{0.05/12} \approx 10.494$. So expected pnl is approximately $10.494-10.451 = 0.043$, but I was seeing $-0.31$
+
+## Results
+
+Doing a run with 100,000 scenarios (10,000 scenarios on each worker), and 100,000 inner Monte Carlo iterations, the computed 99% 1-month VaR $6.7060, and ES is $7.2452. The total number of paths simulated is $10^10$.

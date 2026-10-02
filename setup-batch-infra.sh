@@ -26,8 +26,9 @@ aws --profile personal-admin batch register-job-definition \
         },
         "environment": [
             {"name": "s3_bucket", "value": "avi-mc-pricer-results"},
-            {"name": "num_workers", "value": "4"},
-            {"name": "num_simulations", "value": "20"}
+            {"name": "num_workers", "value": "10"},
+            {"name": "num_simulations", "value": "1000"},
+            {"name": "iterations", "value": "10000"}
         ],
         "jobRoleArn": "arn:aws:iam::091095727984:role/BatchEcsJobRole"
     }'

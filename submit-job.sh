@@ -6,5 +6,7 @@ aws --profile personal-admin batch submit-job \
     --array-properties size=10 \
     --container-overrides "{\"environment\": [
         {\"name\":\"run_id\", \"value\":\"$RUN_ID\"},
-        {\"name\":\"num_workers\", \"value\":\"10\"}
+        {\"name\":\"num_workers\", \"value\":\"10\"},
+        {\"name\":\"num_simulations\", \"value\": \"10000\"},
+        {\"name\":\"iterations\", \"value\": \"100000\"}
     ]}"
