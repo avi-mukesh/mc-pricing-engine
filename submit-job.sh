@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 RUN_ID="run-$(date +%Y%m%d-%H%M%S)"
 aws --profile personal batch submit-job \
     --job-name mc-pricer-job \

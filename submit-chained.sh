@@ -1,13 +1,10 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
 RUN_ID="run-$(date +%Y%m%d-%H%M%S)"
 NUM_WORKERS=$1
 NUM_SIMULATIONS=$2
 NUM_ITERATIONS=$3
-
-echo $NUM_WORKERS
-echo $NUM_SIMULATIONS
-echo $NUM_ITERATIONS
 
 ARRAY_JOB_ID=$(aws --profile personal batch submit-job \
     --job-name mc-pricer-job \
