@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copy the application code into /app
-COPY pricing.py main.py ./
+COPY pricing.py main.py aggregate.py ./
 
 # what happens when you START a container from this image
 CMD ["python3", "main.py"] 

@@ -1,5 +1,5 @@
 RUN_ID="run-$(date +%Y%m%d-%H%M%S)"
-aws --profile personal-admin batch submit-job \
+aws --profile personal batch submit-job \
     --job-name mc-pricer-job \
     --job-queue mc-pricer-job-queue \
     --job-definition mc-pricer-job-definition \

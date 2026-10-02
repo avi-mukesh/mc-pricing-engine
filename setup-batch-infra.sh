@@ -17,8 +17,8 @@ aws --profile personal-admin batch register-job-definition \
     --container-properties '{
         "image": "091095727984.dkr.ecr.us-east-1.amazonaws.com/mc-pricer",
         "resourceRequirements": [
-            {"type": "VCPU", "value": "0.25"},
-            {"type": "MEMORY", "value": "512"}
+            {"type": "VCPU", "value": "0.5"},
+            {"type": "MEMORY", "value": "1024"}
         ],
         "executionRoleArn": "arn:aws:iam::091095727984:role/BatchEcsTaskExecutionRoleTutorial",
         "networkConfiguration": {
@@ -29,6 +29,28 @@ aws --profile personal-admin batch register-job-definition \
             {"name": "num_workers", "value": "10"},
             {"name": "num_simulations", "value": "1000"},
             {"name": "iterations", "value": "10000"}
+        ],
+        "jobRoleArn": "arn:aws:iam::091095727984:role/BatchEcsJobRole"
+    }'
+    
+aws --profile personal-admin batch register-job-definition \
+    --job-definition-name mc-pricer-aggregator-job-definition \
+    --type container \
+    --platform-capabilities FARGATE \
+    --container-properties '{
+        "command": ["python3", "aggregate.py"],
+        "image": "091095727984.dkr.ecr.us-east-1.amazonaws.com/mc-pricer",
+        "resourceRequirements": [
+            {"type": "VCPU", "value": "0.25"},
+            {"type": "MEMORY", "value": "1024"}
+        ],
+        "executionRoleArn": "arn:aws:iam::091095727984:role/BatchEcsTaskExecutionRoleTutorial",
+        "networkConfiguration": {
+            "assignPublicIp": "ENABLED"
+        },
+        "environment": [
+            {"name": "s3_bucket", "value": "avi-mc-pricer-results"},
+            {"name": "num_workers", "value": "10"}
         ],
         "jobRoleArn": "arn:aws:iam::091095727984:role/BatchEcsJobRole"
     }'
