@@ -475,6 +475,8 @@ To submit a batch job, run `./submit-job.sh`.
 
 `aggregator.py` takes the S3 bucket and the `run_id` to collate the results into one pnl array before getting the VaR. 
 
+Run `./submit-chained.sh <num_workers> <num_simulations> <num_iterations>` to sequentially run the pnl workers, followed by the aggregator.
+
 ## IAM Roles
 
 The batch job requires two roles. An execution role with built-in policy `AmazonECSTaskExecutionRolePolicy` that pulls the image from ECR and writes logs. And a job role with policy `mc-pricer-s3-access` which writes the pnl arrays results to S3. The policy JSON for the latter is as follows
