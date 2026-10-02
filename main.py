@@ -52,5 +52,7 @@ run_id = os.environ.get('run_id', 'local')
 
 if bucket:
     key = f"runs/{run_id}/pnl_{worker_index}.npy"
-    boto3.client("s3").upload_file(local_path, bucket, key)
+    profile = os.environ.get("aws_profile")
+    session = boto3.Session(profile_name=profile) if profile else boto3.Session()
+    session.client("s3").upload_file(local_path, bucket, key)
     print(f'uploaded to s3://{bucket}/{key}')
