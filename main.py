@@ -18,12 +18,14 @@ num_workers = int(os.environ.get("num_workers", 1))
 num_simulations = int(os.environ.get("num_simulations", 200))
 iterations = int(os.environ.get("iterations", 1000))
 
-# print(f'num_simulations = {num_simulations}')
-# print(f'num_workers = {num_workers}')
-# print(f'worker_index = {worker_index}')
-# print(f'iterations = {iterations}')
+print(f'num_simulations = {num_simulations}')
+print(f'num_workers = {num_workers}')
+print(f'worker_index = {worker_index}')
+print(f'iterations = {iterations}')
 
-root = np.random.SeedSequence(12345)
+
+root_seed = int(os.environ.get("root_seed", 12345))
+root = np.random.SeedSequence(root_seed)
 child = root.spawn(num_workers)[worker_index]
 rng = np.random.default_rng(child)
 
@@ -60,13 +62,15 @@ if bucket:
     print(f'uploaded to s3://{bucket}/{key}')
     
     if worker_index == 0:
-        obj = {
-            "S0": S0,
-            "K": K,
-            "T": T,
-            "t": t,
-            "r": rf,
-            "sigma": sigma,
-            "type": "European Call"
+        manifest = {
+            "option_type": "european_call",
+            "market": {"S0": S0, "K": K, "T": T, "t": t, "rf": rf, "sigma": sigma},
+            "workload": {
+                "num_workers": num_workers,
+                "num_simulations": num_simulations,
+                "iterations": iterations,
+            },
+            "root_seed": root_seed,
+            "V0": float(V0),
         }
-        s3.put_object(Bucket=bucket, Key=f"runs/{run_id}/inputs/params.json", Body=json.dumps(obj))
+        s3.put_object(Bucket=bucket, Key=f"runs/{run_id}/inputs/manifest.json", Body=json.dumps(manifest))

@@ -37,8 +37,6 @@ np.save('pnl.npy', pnl)
 
 summary = {
     "run_id": run_id,
-    "num_workers": num_workers,
-    "num_scenarios": len(pnl),
     "var_99": float(-var99),
     "es_99": float(-es99)
 }

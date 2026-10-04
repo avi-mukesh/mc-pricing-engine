@@ -1,0 +1,12 @@
+{
+  "S0": 150,
+  "K": 100,
+  "T": 1,
+  "t": 0.0833,
+  "rf": 0.05,
+  "sigma": 0.2,
+  "num_workers": 10,
+  "num_simulations": 1000,
+  "iterations": 100000,
+  "root_seed": 12345
+}
