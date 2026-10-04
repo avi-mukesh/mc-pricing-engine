@@ -467,15 +467,13 @@ The cost of using Monte Carlo here is `num_simulations x iterations`. This resul
 
 # Deploying to AWS
 
-I use AWS Batch to split the simulation workload across multiple workers. Each worker runs 10000 stock price simulations into the future (t=1/12), calculates the price of a European call at that time, and subtracts the current price of the option (calculated using Black Scholes), resulting in a pnl array of size 10000. Each worker receives its own `worker_index` which is provided by `AWS_BATCH_JOB_ARRAY_INDEX`, and stores its section of pnl into S3 under `runs/{run_id}/pnl_{worker_index}.npy`.
+I use AWS Batch to split the simulation workload across multiple workers. Each worker runs 10000 stock price simulations into the future (t=1/12), calculates the price of a European call at that time, and subtracts the current price of the option (calculated using Black Scholes), resulting in a pnl array of size 10000. Each worker receives its own `worker_index` which is provided by `AWS_BATCH_JOB_ARRAY_INDEX`, and stores its section of pnl into S3 under `runs/{run_id}/pnl/pnl_{worker_index}.npy`. One of the workers also stores a file under `runs/{run_id}/inputs/manifest.json` which just saves the market params used for that run, and the worker params (num simulations, num workers, and num Monte carlo iterations).
 
-After making changes to `main.py`, run `./docker-build-and-deploy.sh` to create a new image and push it to ECR.
+After making changes to `main.py`, run `./deploy.sh` to create a new image and push it to ECR.
 
-To submit a batch job, run `./submit-job.sh`.
+To submit a job, run `./submit-chained.sh`. This reads config from file `config/base.json` and builds the environment JSON that the batch job reads. The aggregator batch job depends on the pnl being calculated, so starts only after. The aggregate job takes the S3 bucket and the `run_id` to collate the results into one pnl array before getting the VaR. The job stores this in S3 under `runs/{run_id}/results/summary.json`.
 
-`aggregator.py` takes the S3 bucket and the `run_id` to collate the results into one pnl array before getting the VaR. 
-
-Run `./submit-chained.sh <num_workers> <num_simulations> <num_iterations>` to sequentially run the pnl workers, followed by the aggregator.
+Note currently only European call options are supported. These already have a closed form so this distribution currently mainly demonstrates a proof-of-concept - it would be more useful for more complex option types such as arithmetic Asians.
 
 ## IAM Roles
 
@@ -504,8 +502,8 @@ The batch job requires two roles. An execution role with built-in policy `Amazon
 
 ## Seeding
 
-Have one root seed, spawn individual children per worker, and also per scenario for the inner pricing. This ensures independent non-overlapping streams per worker. I encountered a bug when using the same fixed seed for the inner pricing each time `MonteCarloPricer(params, iterations, worker_index)`. This means each scenario's Monte Carlo error was identical rather than independent. Independent errors average away across scenarios, but correlated ones don't. This resulted in the P&L array containing a bias, with all elements shifted by the same amount. Analytically, since the discounted option price is a martingale i.e. $\mathbb{E}[V_t] = V_0e^{rt}$, we expect $V_{1/12}$ to be approximately $10.451 \times e^{0.05/12} \approx 10.494$. So expected pnl is approximately $10.494-10.451 = 0.043$, but I was seeing $-0.31$
+Have one root seed, spawn individual children per worker, and also per scenario for the inner pricing. This ensures independent non-overlapping streams per worker. I encountered a bug when I was passing `worker_index` as the inner seed, so every scenario inside a worker priced with identical shocks `MonteCarloPricer(params, iterations, worker_index)`. This means each scenario's Monte Carlo error was identical rather than independent. Independent errors average away across scenarios, but correlated ones don't. This resulted in the P&L array containing a bias, with all elements shifted by the same amount. Analytically, since the discounted option price is a martingale i.e. $\mathbb{E}[V_t] = V_0e^{rt}$, we expect $V_{1/12}$ to be approximately $10.451 \times e^{0.05/12} \approx 10.494$. So expected pnl is approximately $10.494-10.451 = 0.043$, but I was seeing $-0.31$. I verified that this was bias by scaling the number of simulations by 50x, expecting the noise to shrink by $\approx \sqrt{50} \approx 7$, but the pnl only moved to $-0.20$
 
 ## Results
 
-Doing a run with 100,000 scenarios (10,000 scenarios on each worker), and 100,000 inner Monte Carlo iterations, the computed 99% 1-month VaR $6.7060, and ES is $7.2452. The total number of paths simulated is $10^10$.
+Doing a run with 100,000 scenarios (10,000 scenarios on each worker), and 100,000 inner Monte Carlo iterations, the computed 99% 1-month VaR is 6.7060, and ES is $7.2452. The total number of paths simulated is $10^{10}$.
