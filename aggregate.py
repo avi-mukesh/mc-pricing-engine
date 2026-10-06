@@ -8,7 +8,7 @@ profile = os.environ.get("aws_profile")
 session = boto3.Session(profile_name=profile) if profile else boto3.Session()
 s3 = session.client("s3")
 
-bucket = os.environ.get('s3_bucket', 'avi-mc-pricer-results')
+bucket = os.environ.get('s3_bucket', 'mc-pricer-results')
 num_workers = os.environ['num_workers']
 run_id = os.environ['run_id']
 
