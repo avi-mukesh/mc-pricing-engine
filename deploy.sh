@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname "$0")/stack-outputs.sh"
 
-PROFILE=personal-admin
+PROFILE=personal
 IMAGE=$(stack_output McPricerImage)  # e.g. 0910...dkr.ecr.us-east-1.amazonaws.com/mc-pricer
 REGISTRY=${IMAGE%%/*}                # strip the repo name to get the registry host
 REGION=$(cut -d. -f4 <<< "$REGISTRY")
