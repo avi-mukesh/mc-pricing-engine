@@ -3,11 +3,13 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     RemovalPolicy,
+    Size,
     aws_s3 as s3,
     aws_ecr as ecr,
     aws_iam as iam,
     aws_ec2 as ec2,
-    
+    aws_batch as batch,
+    aws_ecs as ecs,
 )
 from constructs import Construct
 
@@ -79,8 +81,61 @@ class McPricerStack(Stack):
             description="Batch workers: outbound only",
             allow_all_outbound=True
         )
-        
+
+        compute_environment = batch.FargateComputeEnvironment(
+            self, "McComputeEnvironment",
+            compute_environment_name="mc-pricer-compute-env",
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
+            security_groups=[security_group],
+            maxv_cpus=128
+        )
+
+        job_queue = batch.JobQueue(
+            self, "McJobQueue",
+            job_queue_name="mc-pricer-job-queue",
+            compute_environments=[batch.OrderedComputeEnvironment(
+                compute_environment=compute_environment,
+                order=1
+            )]
+        )
+
+        # worker and aggregator share one image, deploy.sh pushes it as :latest
+        image = ecs.ContainerImage.from_ecr_repository(repository, "latest")
+
+        worker_job_definition = batch.EcsJobDefinition(
+            self, "McWorkerJobDefinition",
+            job_definition_name="mc-pricer-job-definition",
+            container=batch.EcsFargateContainerDefinition(
+                self, "McWorkerContainer",
+                image=image,
+                cpu=0.5,
+                memory=Size.mebibytes(1024),
+                assign_public_ip=True,
+                job_role=worker_job_role,
+                execution_role=execution_role,
+                environment={"s3_bucket": bucket.bucket_name}
+            )
+        )
+
+        aggregator_job_definition = batch.EcsJobDefinition(
+            self, "McAggregatorJobDefinition",
+            job_definition_name="mc-pricer-aggregator-job-definition",
+            container=batch.EcsFargateContainerDefinition(
+                self, "McAggregatorContainer",
+                image=image,
+                command=["python3", "aggregate.py"],
+                cpu=0.25,
+                memory=Size.mebibytes(1024),
+                assign_public_ip=True,
+                job_role=aggregator_job_role,
+                execution_role=execution_role,
+                environment={"s3_bucket": bucket.bucket_name}
+            )
+        )
+
         # TODO - use this in deploy.sh
         CfnOutput(self, "McPricerImage", value=repository.repository_uri)
         CfnOutput(self, "BucketName", value=bucket.bucket_name)
+        CfnOutput(self, "JobQueueName", value=job_queue.job_queue_name)
         
