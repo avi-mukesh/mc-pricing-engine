@@ -5,7 +5,9 @@ from aws_cdk import (
     RemovalPolicy,
     aws_s3 as s3,
     aws_ecr as ecr,
-    aws_iam as iam
+    aws_iam as iam,
+    aws_ec2 as ec2,
+    
 )
 from constructs import Construct
 
@@ -55,6 +57,27 @@ class McPricerStack(Stack):
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AmazonECSTaskExecutionRolePolicy')
             ]
+        )
+        
+        vpc = ec2.Vpc(
+            self, "McVPC",
+            ip_addresses=ec2.IpAddresses.cidr("10.0.0.0/16"),
+            nat_gateways=0,
+            max_azs=2,
+            subnet_configuration=[
+                ec2.SubnetConfiguration(
+                    name="public",
+                    subnet_type=ec2.SubnetType.PUBLIC,
+                    cidr_mask=24,
+                )
+            ],
+        )
+        
+        security_group = ec2.SecurityGroup(
+            self, "McWorkerSecurityGroup",
+            vpc=vpc,
+            description="Batch workers: outbound only",
+            allow_all_outbound=True
         )
         
         # TODO - use this in deploy.sh
