@@ -134,8 +134,10 @@ class McPricerStack(Stack):
             )
         )
 
-        # TODO - use this in deploy.sh
+        # cdk deploy writes these to stack-outputs.json (outputsFile in cdk.json) for the shell scripts
         CfnOutput(self, "McPricerImage", value=repository.repository_uri)
         CfnOutput(self, "BucketName", value=bucket.bucket_name)
         CfnOutput(self, "JobQueueName", value=job_queue.job_queue_name)
+        CfnOutput(self, "WorkerJobDefinitionArn", value=worker_job_definition.job_definition_arn)
+        CfnOutput(self, "AggregatorJobDefinitionArn", value=aggregator_job_definition.job_definition_arn)
         

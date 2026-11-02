@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "$0")/stack-outputs.sh"
+
+JOB_QUEUE=$(stack_output JobQueueName)
+WORKER_JOB_DEF=$(stack_output WorkerJobDefinitionArn)
+AGGREGATOR_JOB_DEF=$(stack_output AggregatorJobDefinitionArn)
 
 CONFIG=${1:-config/base.json}
 if [[ ! -f "$CONFIG" ]]; then
@@ -20,8 +25,8 @@ echo "run_id=$RUN_ID config=$CONFIG workers=$NUM_WORKERS"
 
 ARRAY_JOB_ID=$(aws --profile personal batch submit-job \
     --job-name mc-pricer-job \
-    --job-queue mc-pricer-job-queue \
-    --job-definition mc-pricer-job-definition \
+    --job-queue "$JOB_QUEUE" \
+    --job-definition "$WORKER_JOB_DEF" \
     --array-properties size=$NUM_WORKERS \
     --container-overrides "$ENV_JSON" \
     --query jobId \
@@ -32,8 +37,8 @@ echo Worker jobs starting... jobId=$ARRAY_JOB_ID
 
 AGG_JOB_ID=$(aws --profile personal batch submit-job \
     --job-name mc-pricer-aggregate-job \
-    --job-queue mc-pricer-job-queue \
-    --job-definition mc-pricer-aggregator-job-definition \
+    --job-queue "$JOB_QUEUE" \
+    --job-definition "$AGGREGATOR_JOB_DEF" \
     --container-overrides "{\"environment\": [
         {\"name\":\"run_id\", \"value\":\"$RUN_ID\"},
         {\"name\":\"num_workers\", \"value\":\"$NUM_WORKERS\"}
