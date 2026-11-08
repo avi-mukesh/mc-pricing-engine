@@ -40,8 +40,7 @@ AGG_JOB_ID=$(aws --profile personal batch submit-job \
     --job-queue "$JOB_QUEUE" \
     --job-definition "$AGGREGATOR_JOB_DEF" \
     --container-overrides "{\"environment\": [
-        {\"name\":\"run_id\", \"value\":\"$RUN_ID\"},
-        {\"name\":\"num_workers\", \"value\":\"$NUM_WORKERS\"}
+        {\"name\":\"run_id\", \"value\":\"$RUN_ID\"}
     ]}" \
     --depends-on "jobId=$ARRAY_JOB_ID" \
     --query jobId \

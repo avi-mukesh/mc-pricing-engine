@@ -12,6 +12,5 @@ aws --profile personal batch submit-job \
     --job-queue "$JOB_QUEUE" \
     --job-definition "$AGGREGATOR_JOB_DEF" \
     --container-overrides "{\"environment\": [
-        {\"name\":\"run_id\", \"value\":\"$RUN_ID\"},
-        {\"name\":\"num_workers\", \"value\":\"10\"}
+        {\"name\":\"run_id\", \"value\":\"$RUN_ID\"}
     ]}"
