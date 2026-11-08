@@ -33,7 +33,7 @@ class McPricerStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             empty_on_delete=True,
             lifecycle_rules=[ecr.LifecycleRule(
-                description="Keep only the the 5 most recent images",
+                description="Keep only the 5 most recent images",
                 max_image_count=5
             )]
         )
@@ -43,14 +43,15 @@ class McPricerStack(Stack):
             assumed_by=iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
             role_name="mc-worker-job-role"
         )
-        bucket.grant_write(worker_job_role)
+        bucket.grant_put(worker_job_role)
         
         aggregator_job_role = iam.Role(
             self, "McAggregatorJobRole",
             assumed_by=iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
             role_name="mc-aggregator-job-role"
         )
-        bucket.grant_read_write(aggregator_job_role)
+        bucket.grant_read(aggregator_job_role)
+        bucket.grant_put(aggregator_job_role)
         
         execution_role = iam.Role(
             self, "ExecutionRole",
