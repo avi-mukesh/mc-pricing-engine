@@ -10,6 +10,7 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_batch as batch,
     aws_ecs as ecs,
+    aws_logs as logs,
 )
 from constructs import Construct
 
@@ -104,6 +105,13 @@ class McPricerStack(Stack):
         # worker and aggregator share one image, deploy.sh pushes it as :latest
         image = ecs.ContainerImage.from_ecr_repository(repository, "latest")
 
+        # DESTROY because log groups default to RETAIN and would outlive cdk destroy
+        job_logs = logs.LogGroup(
+            self, "McJobLogs",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY
+        )
+
         worker_job_definition = batch.EcsJobDefinition(
             self, "McWorkerJobDefinition",
             job_definition_name="mc-pricer-job-definition",
@@ -115,7 +123,8 @@ class McPricerStack(Stack):
                 assign_public_ip=True,
                 job_role=worker_job_role,
                 execution_role=execution_role,
-                environment={"s3_bucket": bucket.bucket_name}
+                environment={"s3_bucket": bucket.bucket_name},
+                logging=ecs.LogDriver.aws_logs(stream_prefix="worker", log_group=job_logs)
             )
         )
 
@@ -131,7 +140,8 @@ class McPricerStack(Stack):
                 assign_public_ip=True,
                 job_role=aggregator_job_role,
                 execution_role=execution_role,
-                environment={"s3_bucket": bucket.bucket_name}
+                environment={"s3_bucket": bucket.bucket_name},
+                logging=ecs.LogDriver.aws_logs(stream_prefix="aggregator", log_group=job_logs)
             )
         )
 

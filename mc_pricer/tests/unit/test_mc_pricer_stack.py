@@ -86,6 +86,19 @@ def test_job_definitions_pass_the_stack_bucket(template):
         assert env["s3_bucket"] == {"Ref": bucket_id}
 
 
+def test_job_logs_go_to_a_group_that_expires(template):
+    # without a log configuration jobs fall back to /aws/batch/job, which never expires
+    groups = template.find_resources("AWS::Logs::LogGroup")
+    for props in job_definitions(template):
+        log_config = props["ContainerProperties"].get("LogConfiguration")
+        assert log_config, "job definition has no log configuration"
+        group_id = log_config["Options"]["awslogs-group"]["Ref"]
+        # CDK's default is two years, so check for a deliberate short retention, not just any
+        retention = groups[group_id]["Properties"].get("RetentionInDays")
+        assert retention is not None, "job log group never expires"
+        assert retention <= 30, f"job logs kept for {retention} days"
+
+
 def test_outputs_the_scripts_read_exist(template):
     # stack-outputs.sh looks these up by name, so renaming one breaks deploy.sh and the submit scripts
     outputs = template.find_outputs("*")
