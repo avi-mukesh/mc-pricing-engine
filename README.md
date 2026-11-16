@@ -6,7 +6,7 @@ I simulate price paths and estimate price of European options, arithmetic Asian 
 
 Currently I calculate one of the Greeks, $\Delta$, for a European call, using two methods: pathwise differentiation, and likelihood ratio, and compare them to the exact value predicted by Black Scholes. I also calculate Value at Risk (VaR) and Expected Shortfall (ES) using both Monte Carlo paths, and Black Schoeles, and compare the time taken for both.
 
-I am now in the middle of containerising and deploying to the cloud.
+The VaR calculation is containerised and runs distributed on AWS Batch, with all the infrastructure defined in CDK - see [Deploying to AWS](#deploying-to-aws).
 
 ## The maths
 Under risk-neutral measure, we model the stock as GBM $dS_t=r_fS_tdt+\sigma S_t dW_t$.
@@ -467,7 +467,26 @@ The cost of using Monte Carlo here is `num_simulations x iterations`. This resul
 
 # Deploying to AWS
 
-I use AWS Batch to split the simulation workload across multiple workers. Each worker runs 10000 stock price simulations into the future (t=1/12), calculates the price of a European call at that time, and subtracts the current price of the option (calculated using Black Scholes), resulting in a pnl array of size 10000. Each worker receives its own `worker_index` which is provided by `AWS_BATCH_JOB_ARRAY_INDEX`, and stores its section of pnl into S3 under `runs/{run_id}/pnl/pnl_{worker_index}.npy`. One of the workers also stores a file under `runs/{run_id}/inputs/manifest.json` which just saves the market params used for that run, and the worker params (num simulations, num workers, and num Monte carlo iterations).
+## Architecture
+
+The VaR calculation is nested Monte Carlo: an outer simulation of scenarios at the horizon $t$, and an inner simulation to price the option in each scenario. This is embarrassingly parallel across scenarios, so I split it with AWS Batch into a fan-out and a fan-in.
+
+```
+submit-chained.sh
+   │
+   ├─► worker array job (num_workers containers, in parallel)
+   │      worker i: simulate num_simulations scenarios to t, price each with inner MC,
+   │                PnL = V_t - V_0  →  s3://…/runs/{run_id}/pnl/pnl_{i}.npy
+   │      worker 0 also writes            s3://…/runs/{run_id}/inputs/manifest.json
+   │
+   └─► aggregator job (starts only once every worker has succeeded, via --depends-on)
+          concatenate all pnl arrays → VaR and ES
+          → s3://…/runs/{run_id}/results/summary.json and results/pnl.npy
+```
+
+Workers write their raw PnL arrays rather than computing a VaR each. VaR is a percentile, and percentiles don't combine: the 1st percentile of the whole distribution isn't any function of the 1st percentiles of the pieces. ES has the same problem since it averages over that tail. Concatenating the arrays gives the exact answer, and at 8 bytes per scenario the arrays are small (100,000 scenarios is 800KB).
+
+The aggregator fails if any worker's array is missing, rather than computing a VaR from part of the distribution, and `summary.json` includes the run's inputs so a result always says what produced it.
 
 Note currently only European call options are supported. These already have a closed form so this distribution currently mainly demonstrates a proof-of-concept - it would be more useful for more complex option types such as arithmetic Asians.
 
@@ -475,11 +494,12 @@ Note currently only European call options are supported. These already have a cl
 
 All the AWS infrastructure is defined in the CDK app in `mc_pricer/` (stack `McPricerStack`):
 
-- S3 bucket `mc-pricer-bucket` for pnl arrays, manifests and results
-- ECR repository `mc-pricer` for the image
-- a VPC with two public subnets and no NAT gateway, and an outbound-only security group for the workers
-- a Fargate compute environment and the job queue `mc-pricer-job-queue`
-- job definitions for the worker and the aggregator, which share the same image (the aggregator runs `python3 aggregate.py`)
+- S3 bucket for inputs, pnl arrays and results
+- ECR repository for the image
+- a VPC with public subnets and no NAT gateway (which costs around \$32 a month even when idle), so tasks get public IPs to reach ECR and S3
+- a Fargate compute environment and job queue
+- worker and aggregator job definitions sharing one image
+- a log group with 30-day retention, since Batch's default `/aws/batch/job` group never expires
 
 To deploy changes to the infrastructure, from `mc_pricer/` with its venv active
 
@@ -488,30 +508,30 @@ cdk diff --profile personal-admin
 cdk deploy --profile personal-admin
 ```
 
-`cdk deploy` writes the stack outputs (image URI, queue name, job definition ARNs) to `stack-outputs.json` in the repo root. The shell scripts read names from there via `stack-outputs.sh` instead of hard-coding them, so this needs to have been run at least once on the machine.
+`cdk deploy` writes the stack outputs (image URI, bucket, queue name, job definition ARNs) to `stack-outputs.json` in the repo root. The shell scripts read names from there via `stack-outputs.sh` instead of hard-coding them, so this needs to have been run at least once on the machine.
+
+### Deploy order
+
+After a fresh `cdk deploy` (e.g. after `cdk destroy`), the ECR repository is empty. Run `./deploy.sh` before submitting anything. Batch doesn't check that the image exists when the job definition is registered, so a missing image only shows up at runtime as a `CannotPullContainerError`.
 
 ## Running a job
 
 After making changes to `main.py`, `pricing.py` or `aggregate.py`, run `./deploy.sh` to build a new image and push it to ECR as `latest`. Code changes don't need a `cdk deploy`, since the job definitions always pull `latest`.
 
-To submit a job, run `./submit-chained.sh`. This reads config from file `config/base.json` and builds the environment JSON that the batch job reads. The aggregator batch job depends on the pnl being calculated, so starts only after. The aggregate job takes the S3 bucket and the `run_id` to collate the results into one pnl array before getting the VaR. The job stores this in S3 under `runs/{run_id}/results/summary.json`. To rerun just the aggregation for an existing run, use `./submit-aggregate-job.sh RUN_ID`.
+To submit a job, run `./submit-chained.sh`, which reads `config/base.json` (or a config file given as the first argument). To see the result, `python3 show_summary.py RUN_ID` prints its `summary.json`. To rerun just the aggregation for an existing run, use `./submit-aggregate-job.sh RUN_ID`.
 
 ## IAM Roles
 
-The batch jobs use three roles, all defined in the stack:
-
-- an execution role with the built-in policy `AmazonECSTaskExecutionRolePolicy`, which pulls the image from ECR and writes logs
-- a worker job role, which can only write to the bucket (`bucket.grant_write`)
-- an aggregator job role, which can read and write the bucket (`bucket.grant_read_write`), since it lists and reads the pnl arrays and writes the summary
-
-The policies are generated by CDK from these grants, so they always point at the bucket the stack actually created. The bucket name is also passed to the containers as the `s3_bucket` environment variable.
-
-`cdk deploy` runs as the `personal-admin` profile. `deploy.sh` and the submit scripts run as `personal`, a less privileged user which can only push to the ECR repository, submit and describe jobs, and read results.
+The jobs use three roles defined in the stack: an execution role (pulls the image, writes logs), a worker role that can only put objects in the bucket, and an aggregator role that can read and put. Neither job role can delete, which is why I used `grant_put` and `grant_read` rather than `grant_write` and `grant_read_write`.
 
 ## Seeding
 
-Have one root seed, spawn individual children per worker, and also per scenario for the inner pricing. This ensures independent non-overlapping streams per worker. I encountered a bug when I was passing `worker_index` as the inner seed, so every scenario inside a worker priced with identical shocks `MonteCarloPricer(params, iterations, worker_index)`. This means each scenario's Monte Carlo error was identical rather than independent. Independent errors average away across scenarios, but correlated ones don't. This resulted in the P&L array containing a bias, with all elements shifted by the same amount. Analytically, since the discounted option price is a martingale i.e. $\mathbb{E}[V_t] = V_0e^{rt}$, we expect $V_{1/12}$ to be approximately $10.451 \times e^{0.05/12} \approx 10.494$. So expected pnl is approximately $10.494-10.451 = 0.043$, but I was seeing $-0.31$. I verified that this was bias by scaling the number of simulations by 50x, expecting the noise to shrink by $\approx \sqrt{50} \approx 7$, but the pnl only moved to $-0.20$
+One root seed spawns a child seed per worker, and each of those spawns one per scenario for the inner pricing, so every stream is independent. An earlier version seeded the inner pricing with `worker_index`, so every scenario in a worker used identical shocks and had the same Monte Carlo error. Correlated errors don't average away, so the whole PnL array was shifted. Since $\mathbb{E}[V_t] = V_0e^{rt}$, the expected PnL was about $+0.043$, but I saw $-0.31$, and 50x more scenarios only moved it to $-0.20$ rather than shrinking it by $\sqrt{50}$, which confirmed a bias rather than noise.
+
+## Reproducibility
+
+Every random number comes from the root seed, so a run is fully determined by its config. Submitting `config/repro.json` twice gave identical summaries and bit-for-bit identical pnl arrays. This holds for the same root seed and `num_workers`: changing the number of workers changes how the seed tree is split, which gives different (equally valid) results.
 
 ## Results
 
-Doing a run with 100,000 scenarios (10,000 scenarios on each worker), and 100,000 inner Monte Carlo iterations, the computed 99% 1-month VaR is 6.7060, and ES is $7.2452. The total number of paths simulated is $10^{10}$.
+Doing a run with 100,000 scenarios (10,000 scenarios on each worker), and 100,000 inner Monte Carlo iterations, the computed 99% 1-month VaR is 6.7060, and ES is 7.2452. The total number of paths simulated is $10^{10}$.
