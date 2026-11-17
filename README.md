@@ -472,14 +472,14 @@ The cost of using Monte Carlo here is `num_simulations x iterations`. This resul
 The VaR calculation is nested Monte Carlo: an outer simulation of scenarios at the horizon $t$, and an inner simulation to price the option in each scenario. This is embarrassingly parallel across scenarios, so I split it with AWS Batch into a fan-out and a fan-in.
 
 ```
-submit-chained.sh
+nightly schedule → mc-pricer-run state machine   (or submit-chained.sh)
    │
    ├─► worker array job (num_workers containers, in parallel)
    │      worker i: simulate num_simulations scenarios to t, price each with inner MC,
    │                PnL = V_t - V_0  →  s3://…/runs/{run_id}/pnl/pnl_{i}.npy
    │      worker 0 also writes            s3://…/runs/{run_id}/inputs/manifest.json
    │
-   └─► aggregator job (starts only once every worker has succeeded, via --depends-on)
+   └─► aggregator job (starts only once every worker has succeeded)
           concatenate all pnl arrays → VaR and ES
           → s3://…/runs/{run_id}/results/summary.json and results/pnl.npy
 ```
@@ -500,6 +500,8 @@ All the AWS infrastructure is defined in the CDK app in `mc_pricer/` (stack `McP
 - a Fargate compute environment and job queue
 - worker and aggregator job definitions sharing one image
 - a log group with 30-day retention, since Batch's default `/aws/batch/job` group never expires
+- a Step Functions state machine that runs the workers and then the aggregator, waiting for each job to finish
+- an EventBridge Scheduler schedule that starts it at 22:00 London time every night with `config/base.json`
 
 To deploy changes to the infrastructure, from `mc_pricer/` with its venv active
 
@@ -518,7 +520,12 @@ After a fresh `cdk deploy` (e.g. after `cdk destroy`), the ECR repository is emp
 
 After making changes to `main.py`, `pricing.py` or `aggregate.py`, run `./deploy.sh` to build a new image and push it to ECR as `latest`. Code changes don't need a `cdk deploy`, since the job definitions always pull `latest`.
 
-To submit a job, run `./submit-chained.sh`, which reads `config/base.json` (or a config file given as the first argument). To see the result, `python3 show_summary.py RUN_ID` prints its `summary.json`. To rerun just the aggregation for an existing run, use `./submit-aggregate-job.sh RUN_ID`.
+Runs start in one of two ways:
+
+- the nightly schedule, or an execution of the `mc-pricer-run` state machine started by hand in Step Functions with a config as input. The execution name becomes the `run_id`
+- `./submit-chained.sh`, which reads `config/base.json` (or a config file given as the first argument)
+
+The scheduled run uses the fixed `base.json` and seed, so it gives the same result every night until it's fed real market data. To see a result, `python3 show_summary.py RUN_ID` prints its `summary.json`. To rerun just the aggregation for an existing run, use `./submit-aggregate-job.sh RUN_ID`.
 
 ## IAM Roles
 
