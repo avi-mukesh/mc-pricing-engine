@@ -18,12 +18,14 @@ def template():
 
 
 def actions_for_role(template, role_name):
-    # find the role's logical id by its physical name, then collect every action
-    # in the IAM policies attached to it
+    # find the role's logical id by its physical name, then collect its actions
     roles = template.find_resources("AWS::IAM::Role", {"Properties": {"RoleName": role_name}})
     assert len(roles) == 1, f"expected one role named {role_name}"
-    role_id = next(iter(roles))
+    return actions_for_role_id(template, next(iter(roles)))
 
+
+def actions_for_role_id(template, role_id):
+    # collect every action in the IAM policies attached to the role
     actions = []
     for policy in template.find_resources("AWS::IAM::Policy").values():
         if {"Ref": role_id} not in policy["Properties"].get("Roles", []):
@@ -156,3 +158,11 @@ def test_nightly_schedule_runs_base_config_in_london_time(template):
     # a cron without a time zone is UTC and would shift by an hour with daylight saving
     assert props["ScheduleExpressionTimezone"] == "Europe/London"
     assert json.loads(props["Target"]["Input"]) == BASE_CONFIG
+
+
+def test_stopping_a_run_can_terminate_its_jobs(template):
+    # without TerminateJob, stopping an execution (or hitting its timeout) leaves the
+    # Batch jobs running - they finish and keep costing money
+    machine = next(iter(template.find_resources("AWS::StepFunctions::StateMachine").values()))
+    role_id = machine["Properties"]["RoleArn"]["Fn::GetAtt"][0]
+    assert allows(actions_for_role_id(template, role_id), "batch:TerminateJob")

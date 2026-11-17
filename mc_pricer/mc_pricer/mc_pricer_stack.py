@@ -195,6 +195,12 @@ class McPricerStack(Stack):
             # Batch jobs have no timeout of their own, so stop a stuck run from waiting forever
             timeout=Duration.hours(3)
         )
+        # when an execution is stopped or times out, Step Functions tries to terminate the
+        # Batch job it's waiting on - without this, stopped runs leave their jobs running
+        state_machine.add_to_role_policy(iam.PolicyStatement(
+            actions=["batch:TerminateJob"],
+            resources=[self.format_arn(service="batch", resource="job", resource_name="*")]
+        ))
 
         # nightly run with config/base.json, read at synth time so the file stays the one
         # source of truth - edit it and cdk deploy, and the next night uses the new values
