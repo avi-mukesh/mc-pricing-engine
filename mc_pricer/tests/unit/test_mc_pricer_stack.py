@@ -1,4 +1,5 @@
 from fnmatch import fnmatch
+from pathlib import Path
 
 import aws_cdk as cdk
 import pytest
@@ -105,3 +106,53 @@ def test_outputs_the_scripts_read_exist(template):
     for key in ["McPricerImage", "JobQueueName", "WorkerJobDefinitionArn", "AggregatorJobDefinitionArn"]:
         assert key in outputs, f"missing output {key}"
 
+
+
+BASE_CONFIG = json.loads((Path(__file__).parents[3] / "config" / "base.json").read_text())
+
+
+def state_machine_definition(template):
+    machines = template.find_resources("AWS::StepFunctions::StateMachine")
+    assert len(machines) == 1, "expected one state machine"
+    # the definition is a Fn::Join of strings and references to other resources -
+    # swap each reference for a placeholder so the result parses as JSON
+    parts = next(iter(machines.values()))["Properties"]["DefinitionString"]["Fn::Join"][1]
+    return json.loads("".join(p if isinstance(p, str) else "REF" for p in parts))
+
+
+def test_aggregator_runs_after_workers_finish(template):
+    states = state_machine_definition(template)["States"]
+
+    assert states["RunWorkers"]["Next"] == "RunAggregator"
+    # .sync makes each step wait for its Batch job and fail if the job fails,
+    # so the aggregator never runs after a failed fan-out
+    for name in ["RunWorkers", "RunAggregator"]:
+        assert states[name]["Resource"].endswith(":states:::batch:submitJob.sync"), f"{name} doesn't wait"
+    assert states["RunWorkers"]["Parameters"]["ArrayProperties"]["Size.$"] == "$.num_workers"
+
+
+def test_workers_and_aggregator_share_a_run_id(template):
+    # the aggregator finds the workers' arrays by run_id, so both must use the same value
+    states = state_machine_definition(template)["States"]
+    for name in ["RunWorkers", "RunAggregator"]:
+        env = {e["Name"]: e for e in states[name]["Parameters"]["ContainerOverrides"]["Environment"]}
+        assert env["run_id"]["Value.$"] == "$$.Execution.Name"
+
+
+def test_workers_get_every_config_value(template):
+    # the state machine lists the config keys explicitly, so a key added to base.json
+    # would otherwise never reach the workers
+    states = state_machine_definition(template)["States"]
+    env_names = {e["Name"] for e in states["RunWorkers"]["Parameters"]["ContainerOverrides"]["Environment"]}
+    missing = set(BASE_CONFIG) - env_names
+    assert not missing, f"config keys not passed to the workers: {missing}"
+
+
+def test_nightly_schedule_runs_base_config_in_london_time(template):
+    schedules = template.find_resources("AWS::Scheduler::Schedule")
+    assert len(schedules) == 1, "expected one schedule"
+    props = next(iter(schedules.values()))["Properties"]
+
+    # a cron without a time zone is UTC and would shift by an hour with daylight saving
+    assert props["ScheduleExpressionTimezone"] == "Europe/London"
+    assert json.loads(props["Target"]["Input"]) == BASE_CONFIG

@@ -1,6 +1,10 @@
+import json
+from pathlib import Path
+
 from aws_cdk import (
-    # Duration,
+    Duration,
     Stack,
+    TimeZone,
     CfnOutput,
     RemovalPolicy,
     Size,
@@ -11,6 +15,10 @@ from aws_cdk import (
     aws_batch as batch,
     aws_ecs as ecs,
     aws_logs as logs,
+    aws_stepfunctions as sfn,
+    aws_stepfunctions_tasks as tasks,
+    aws_scheduler as scheduler,
+    aws_scheduler_targets as scheduler_targets,
 )
 from constructs import Construct
 
@@ -145,10 +153,70 @@ class McPricerStack(Stack):
             )
         )
 
+        # a run as a state machine: the worker array job, then the aggregator once every worker
+        # has succeeded. The execution input is a config like config/base.json
+        # the execution name is unique per run, so it doubles as the run_id
+        run_id = sfn.JsonPath.execution_name
+
+        # the env vars main.py reads, copied from the config. Batch only takes string values,
+        # and States.Format turns the config's numbers into strings
+        config_keys = ["S0", "K", "T", "t", "rf", "sigma",
+                       "num_workers", "num_simulations", "iterations", "root_seed"]
+        worker_environment = {key: sfn.JsonPath.format("{}", sfn.JsonPath.string_at(f"$.{key}"))
+                              for key in config_keys}
+        worker_environment["run_id"] = run_id
+
+        # BatchSubmitJob defaults to the .sync integration, so each step waits for its job to
+        # finish and fails if the job fails
+        run_workers = tasks.BatchSubmitJob(
+            self, "RunWorkers",
+            job_name="mc-pricer-job",
+            job_queue_arn=job_queue.job_queue_arn,
+            job_definition_arn=worker_job_definition.job_definition_arn,
+            array_size=sfn.JsonPath.number_at("$.num_workers"),
+            container_overrides=tasks.BatchContainerOverrides(environment=worker_environment),
+            # keep the config as the state's data rather than replacing it with Batch's response
+            result_path=sfn.JsonPath.DISCARD
+        )
+
+        run_aggregator = tasks.BatchSubmitJob(
+            self, "RunAggregator",
+            job_name="mc-pricer-aggregate-job",
+            job_queue_arn=job_queue.job_queue_arn,
+            job_definition_arn=aggregator_job_definition.job_definition_arn,
+            container_overrides=tasks.BatchContainerOverrides(environment={"run_id": run_id}),
+            result_path=sfn.JsonPath.DISCARD
+        )
+
+        state_machine = sfn.StateMachine(
+            self, "McRunStateMachine",
+            state_machine_name="mc-pricer-run",
+            definition_body=sfn.DefinitionBody.from_chainable(run_workers.next(run_aggregator)),
+            # Batch jobs have no timeout of their own, so stop a stuck run from waiting forever
+            timeout=Duration.hours(3)
+        )
+
+        # nightly run with config/base.json, read at synth time so the file stays the one
+        # source of truth - edit it and cdk deploy, and the next night uses the new values
+        base_config = json.loads((Path(__file__).parents[2] / "config" / "base.json").read_text())
+        scheduler.Schedule(
+            self, "NightlyRunSchedule",
+            description="Nightly VaR run with config/base.json",
+            # cron in UTC would shift by an hour with daylight saving, so pin the time zone
+            schedule=scheduler.ScheduleExpression.cron(
+                hour="22", minute="0", time_zone=TimeZone.EUROPE_LONDON
+            ),
+            target=scheduler_targets.StepFunctionsStartExecution(
+                state_machine,
+                input=scheduler.ScheduleTargetInput.from_object(base_config)
+            )
+        )
+
         # cdk deploy writes these to stack-outputs.json (outputsFile in cdk.json) for the shell scripts
         CfnOutput(self, "McPricerImage", value=repository.repository_uri)
         CfnOutput(self, "BucketName", value=bucket.bucket_name)
         CfnOutput(self, "JobQueueName", value=job_queue.job_queue_name)
         CfnOutput(self, "WorkerJobDefinitionArn", value=worker_job_definition.job_definition_arn)
         CfnOutput(self, "AggregatorJobDefinitionArn", value=aggregator_job_definition.job_definition_arn)
+        CfnOutput(self, "StateMachineArn", value=state_machine.state_machine_arn)
         
