@@ -166,3 +166,28 @@ def test_stopping_a_run_can_terminate_its_jobs(template):
     machine = next(iter(template.find_resources("AWS::StepFunctions::StateMachine").values()))
     role_id = machine["Properties"]["RoleArn"]["Fn::GetAtt"][0]
     assert allows(actions_for_role_id(template, role_id), "batch:TerminateJob")
+
+
+def function_role_id(template, function_name):
+    functions = template.find_resources("AWS::Lambda::Function", {"Properties": {"FunctionName": function_name}})
+    assert len(functions) == 1, f"expected one function named {function_name}"
+    return next(iter(functions.values()))["Properties"]["Role"]["Fn::GetAtt"][0]
+
+
+def test_market_data_function_reads_its_key_and_writes_snapshots_only(template):
+    actions = actions_for_role_id(template, function_role_id(template, "mc-pricer-fetch-market-data"))
+
+    # what the handler calls: ssm get_parameter and s3 put_object
+    assert allows(actions, "ssm:GetParameter")
+    assert allows(actions, "s3:PutObject")
+    # it has no reason to read or delete run results
+    assert not allows(actions, "s3:GetObject")
+    assert not allows(actions, "s3:DeleteObject")
+
+
+def test_market_data_function_is_told_where_its_key_and_bucket_are(template):
+    functions = template.find_resources("AWS::Lambda::Function", {"Properties": {"FunctionName": "mc-pricer-fetch-market-data"}})
+    env = next(iter(functions.values()))["Properties"]["Environment"]["Variables"]
+    bucket_id = next(iter(template.find_resources("AWS::S3::Bucket")))
+    assert env["s3_bucket"] == {"Ref": bucket_id}
+    assert env["api_key_parameter"] == "/mc-pricer/tiingo-api-key"

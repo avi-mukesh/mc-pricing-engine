@@ -15,6 +15,8 @@ from aws_cdk import (
     aws_batch as batch,
     aws_ecs as ecs,
     aws_logs as logs,
+    aws_lambda as lambda_,
+    aws_ssm as ssm,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
     aws_scheduler as scheduler,
@@ -152,6 +154,40 @@ class McPricerStack(Stack):
                 logging=ecs.LogDriver.aws_logs(stream_prefix="aggregator", log_group=job_logs)
             )
         )
+
+        # FetchMarketData: fetches the ticker's prices from Tiingo, writes a dated snapshot to S3
+        # and returns the config with real S0 and sigma - the first state of the run
+        # the key is created by hand (CloudFormation can't create SecureStrings), so import it by name
+        tiingo_api_key = ssm.StringParameter.from_secure_string_parameter_attributes(
+            self, "TiingoApiKey",
+            parameter_name="/mc-pricer/tiingo-api-key"
+        )
+        market_data_logs = logs.LogGroup(
+            self, "FetchMarketDataLogs",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY
+        )
+        fetch_market_data = lambda_.Function(
+            self, "FetchMarketData",
+            function_name="mc-pricer-fetch-market-data",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            # only the handler goes in the zip - it needs nothing beyond what the runtime provides
+            code=lambda_.Code.from_asset(
+                str(Path(__file__).parents[2] / "market_data"),
+                exclude=["__pycache__"]
+            ),
+            handler="handler.handler",
+            timeout=Duration.seconds(30),
+            environment={
+                "s3_bucket": bucket.bucket_name,
+                "api_key_parameter": tiingo_api_key.parameter_name,
+            },
+            log_group=market_data_logs
+        )
+        # read just this parameter - the default aws/ssm key decrypts for any caller SSM allows
+        tiingo_api_key.grant_read(fetch_market_data)
+        # write snapshots, but no reading or deleting run results
+        bucket.grant_put(fetch_market_data)
 
         # a run as a state machine: the worker array job, then the aggregator once every worker
         # has succeeded. The execution input is a config like config/base.json
