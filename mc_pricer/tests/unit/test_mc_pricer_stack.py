@@ -157,6 +157,8 @@ def test_nightly_schedule_runs_base_config_in_london_time(template):
 
     # a cron without a time zone is UTC and would shift by an hour with daylight saving
     assert props["ScheduleExpressionTimezone"] == "Europe/London"
+    # after the US close has been published, and only on mornings that follow a trading day
+    assert props["ScheduleExpression"] == "cron(0 6 ? * TUE-SAT *)"
     assert json.loads(props["Target"]["Input"]) == BASE_CONFIG
 
 
@@ -220,3 +222,10 @@ def test_fetch_does_not_retry_errors_that_cannot_fix_themselves(template):
     retried = {error for retrier in retriers for error in retrier["ErrorEquals"]}
     assert "HTTPError" in retried
     assert not retried & {"ValueError", "KeyError", "States.ALL"}
+
+
+def test_nightly_config_leaves_market_values_to_the_fetch():
+    # the fetch overwrites S0 and sigma, so values left in base.json would look like they're
+    # used when they never are - and the schedule relies on the fetch knowing what to fetch
+    assert "S0" not in BASE_CONFIG and "sigma" not in BASE_CONFIG
+    assert BASE_CONFIG["ticker"]

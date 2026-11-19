@@ -6,9 +6,16 @@ JOB_QUEUE=$(stack_output JobQueueName)
 WORKER_JOB_DEF=$(stack_output WorkerJobDefinitionArn)
 AGGREGATOR_JOB_DEF=$(stack_output AggregatorJobDefinitionArn)
 
-CONFIG=${1:-config/base.json}
+# runs with fixed inputs, skipping the market data fetch - for reproducibility checks and
+# experiments. Live runs go through the mc-pricer-run state machine instead
+CONFIG=${1:-config/repro.json}
 if [[ ! -f "$CONFIG" ]]; then
     echo "config not found: $CONFIG" >&2
+    exit 1
+fi
+# base.json leaves S0 and sigma to the fetch, so it can't be submitted directly
+if ! jq -e 'has("S0") and has("sigma")' "$CONFIG" > /dev/null; then
+    echo "$CONFIG has no S0 or sigma - it relies on live market data, start it with the state machine" >&2
     exit 1
 fi
 

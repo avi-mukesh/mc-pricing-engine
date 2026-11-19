@@ -265,9 +265,12 @@ class McPricerStack(Stack):
         scheduler.Schedule(
             self, "NightlyRunSchedule",
             description="Nightly VaR run with config/base.json",
+            # 06:00 London is hours after the US close (21:00 London) so Tiingo has published it.
+            # Tuesday to Saturday covers the Monday to Friday closes - Sunday and Monday mornings
+            # would only re-price Friday's close.
             # cron in UTC would shift by an hour with daylight saving, so pin the time zone
             schedule=scheduler.ScheduleExpression.cron(
-                hour="22", minute="0", time_zone=TimeZone.EUROPE_LONDON
+                hour="6", minute="0", week_day="TUE-SAT", time_zone=TimeZone.EUROPE_LONDON
             ),
             target=scheduler_targets.StepFunctionsStartExecution(
                 state_machine,
