@@ -8,5 +8,6 @@
   "num_workers": 10,
   "num_simulations": 1000,
   "iterations": 100000,
-  "root_seed": 12345
+  "root_seed": 12345,
+  "ticker": "SPY"
 }

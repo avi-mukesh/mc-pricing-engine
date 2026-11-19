@@ -62,9 +62,11 @@ if bucket:
     print(f'uploaded to s3://{bucket}/{key}')
     
     if worker_index == 0:
+        ticker = os.environ.get("ticker", "local")
+        market_as_of = os.environ.get("market_as_of")
         manifest = {
             "option_type": "european_call",
-            "market": {"S0": S0, "K": K, "T": T, "t": t, "rf": rf, "sigma": sigma},
+            "market": {"S0": S0, "K": K, "T": T, "t": t, "rf": rf, "sigma": sigma, "ticker": ticker, "market_as_of": market_as_of},
             "workload": {
                 "num_workers": num_workers,
                 "num_simulations": num_simulations,

@@ -191,3 +191,32 @@ def test_market_data_function_is_told_where_its_key_and_bucket_are(template):
     bucket_id = next(iter(template.find_resources("AWS::S3::Bucket")))
     assert env["s3_bucket"] == {"Ref": bucket_id}
     assert env["api_key_parameter"] == "/mc-pricer/tiingo-api-key"
+
+
+def test_a_run_fetches_market_data_before_the_workers(template):
+    # the workers price with S0 and sigma from the fetch, so it must come first
+    definition = state_machine_definition(template)
+    assert definition["StartAt"] == "FetchMarketDataTask"
+    assert definition["States"]["FetchMarketDataTask"]["Next"] == "RunWorkers"
+
+
+def test_workers_get_the_market_data_date(template):
+    # market_as_of isn't in base.json - the fetch adds it, so the config test doesn't cover it
+    states = state_machine_definition(template)["States"]
+    env = {e["Name"]: e for e in states["RunWorkers"]["Parameters"]["ContainerOverrides"]["Environment"]}
+    assert "$.market_as_of" in env["market_as_of"]["Value.$"]
+
+
+def test_state_machine_can_invoke_the_market_data_function(template):
+    machine = next(iter(template.find_resources("AWS::StepFunctions::StateMachine").values()))
+    role_id = machine["Properties"]["RoleArn"]["Fn::GetAtt"][0]
+    assert allows(actions_for_role_id(template, role_id), "lambda:InvokeFunction")
+
+
+def test_fetch_does_not_retry_errors_that_cannot_fix_themselves(template):
+    # too little history or a missing ticker fail the same way every time,
+    # so retrying only delays the failure
+    retriers = state_machine_definition(template)["States"]["FetchMarketDataTask"]["Retry"]
+    retried = {error for retrier in retriers for error in retrier["ErrorEquals"]}
+    assert "HTTPError" in retried
+    assert not retried & {"ValueError", "KeyError", "States.ALL"}

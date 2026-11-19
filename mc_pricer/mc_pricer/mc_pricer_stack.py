@@ -189,15 +189,34 @@ class McPricerStack(Stack):
         # write snapshots, but no reading or deleting run results
         bucket.grant_put(fetch_market_data)
 
-        # a run as a state machine: the worker array job, then the aggregator once every worker
-        # has succeeded. The execution input is a config like config/base.json
+        # a run as a state machine: fetch market data, then the worker array job, then the
+        # aggregator once every worker has succeeded. The execution input is a config like
+        # config/base.json
+        run_fetch = tasks.LambdaInvoke(
+            self, "FetchMarketDataTask",
+            lambda_function=fetch_market_data,
+            # the state's output is just what the handler returns - the config with S0, sigma
+            # and market_as_of added - instead of a wrapper with it under Payload
+            payload_response_only=True
+        )
+        # Tiingo being down or slow is worth waiting out. Errors are named after the Python
+        # exception, and ValueError (too little history) or KeyError (no ticker) aren't retried
+        # because trying again won't fix them
+        run_fetch.add_retry(
+            errors=["HTTPError", "URLError", "TimeoutError"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2
+        )
+
         # the execution name is unique per run, so it doubles as the run_id
         run_id = sfn.JsonPath.execution_name
 
         # the env vars main.py reads, copied from the config. Batch only takes string values,
         # and States.Format turns the config's numbers into strings
         config_keys = ["S0", "K", "T", "t", "rf", "sigma",
-                       "num_workers", "num_simulations", "iterations", "root_seed"]
+                       "num_workers", "num_simulations", "iterations", "root_seed",
+                       "ticker", "market_as_of"]
         worker_environment = {key: sfn.JsonPath.format("{}", sfn.JsonPath.string_at(f"$.{key}"))
                               for key in config_keys}
         worker_environment["run_id"] = run_id
@@ -227,7 +246,9 @@ class McPricerStack(Stack):
         state_machine = sfn.StateMachine(
             self, "McRunStateMachine",
             state_machine_name="mc-pricer-run",
-            definition_body=sfn.DefinitionBody.from_chainable(run_workers.next(run_aggregator)),
+            definition_body=sfn.DefinitionBody.from_chainable(
+                run_fetch.next(run_workers).next(run_aggregator)
+            ),
             # Batch jobs have no timeout of their own, so stop a stuck run from waiting forever
             timeout=Duration.hours(3)
         )
