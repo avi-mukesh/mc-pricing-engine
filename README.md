@@ -472,7 +472,10 @@ The cost of using Monte Carlo here is `num_simulations x iterations`. This resul
 The VaR calculation is nested Monte Carlo: an outer simulation of scenarios at the horizon $t$, and an inner simulation to price the option in each scenario. This is embarrassingly parallel across scenarios, so I split it with AWS Batch into a fan-out and a fan-in.
 
 ```
-nightly schedule → mc-pricer-run state machine   (or submit-chained.sh)
+schedule (06:00 Tue-Sat) → mc-pricer-run state machine
+   │
+   ├─► FetchMarketData Lambda: SPY prices from Tiingo → S0, sigma
+   │      snapshot → s3://…/market/SPY/{close date}.json
    │
    ├─► worker array job (num_workers containers, in parallel)
    │      worker i: simulate num_simulations scenarios to t, price each with inner MC,
@@ -488,7 +491,22 @@ Workers write their raw PnL arrays rather than computing a VaR each. VaR is a pe
 
 The aggregator fails if any worker's array is missing, rather than computing a VaR from part of the distribution, and `summary.json` includes the run's inputs so a result always says what produced it.
 
+`submit-chained.sh` submits the worker and aggregator jobs directly, skipping the fetch, for runs with fixed inputs.
+
+PnL is undiscounted ($V_t - V_0$), and the outer scenarios use the risk-neutral drift $r_f$ rather than a real-world $\mu$, which is hard to estimate. Over a 10-day horizon both make a negligible difference.
+
 Note currently only European call options are supported. These already have a closed form so this distribution currently mainly demonstrates a proof-of-concept - it would be more useful for more complex option types such as arithmetic Asians.
+
+## Market data
+
+Each run starts by fetching SPY's daily prices from [Tiingo](https://www.tiingo.com). `S0` is the latest unadjusted close, the price the strike is compared against. `sigma` is the annualised standard deviation of the last 252 daily log returns of the adjusted closes, so dividends don't show up as drops. The snapshot is written to `market/SPY/{date}.json`, named after the close it's from rather than the run date, and the date is recorded in the run's manifest as `market_as_of`.
+
+The Tiingo API key lives in SSM Parameter Store as a SecureString, never in the repo or config. CloudFormation can't create SecureStrings, so it's created once by hand (`read -s` keeps it out of the shell history):
+
+```
+read -s TIINGO_KEY
+aws ssm put-parameter --name /mc-pricer/tiingo-api-key --type SecureString --value "$TIINGO_KEY" --profile personal-admin && unset TIINGO_KEY
+```
 
 ## Infrastructure (CDK)
 
@@ -500,8 +518,9 @@ All the AWS infrastructure is defined in the CDK app in `mc_pricer/` (stack `McP
 - a Fargate compute environment and job queue
 - worker and aggregator job definitions sharing one image
 - a log group with 30-day retention, since Batch's default `/aws/batch/job` group never expires
-- a Step Functions state machine that runs the workers and then the aggregator, waiting for each job to finish
-- an EventBridge Scheduler schedule that starts it at 22:00 London time every night with `config/base.json`
+- the `mc-pricer-fetch-market-data` Lambda, which can read only the Tiingo key and only put objects in the bucket
+- a Step Functions state machine that fetches market data, runs the workers and then the aggregator, waiting for each job to finish. Tiingo errors are retried; errors that won't fix themselves (too little history, no ticker) aren't
+- an EventBridge Scheduler schedule that starts it with `config/base.json` at 06:00 London time, Tuesday to Saturday. That's well after the US close (21:00 London), so Tiingo has published it, and covers the Monday to Friday closes
 
 To deploy changes to the infrastructure, from `mc_pricer/` with its venv active
 
@@ -522,10 +541,15 @@ After making changes to `main.py`, `pricing.py` or `aggregate.py`, run `./deploy
 
 Runs start in one of two ways:
 
-- the nightly schedule, or an execution of the `mc-pricer-run` state machine started by hand in Step Functions with a config as input. The execution name becomes the `run_id`
-- `./submit-chained.sh`, which reads `config/base.json` (or a config file given as the first argument)
+- live: the schedule, or an execution of the `mc-pricer-run` state machine started by hand with `config/base.json` as input. `base.json` has a ticker but no `S0` or `sigma`, which come from the fetch. The execution name becomes the `run_id`
 
-The scheduled run uses the fixed `base.json` and seed, so it gives the same result every night until it's fed real market data. To see a result, `python3 show_summary.py RUN_ID` prints its `summary.json`. To rerun just the aggregation for an existing run, use `./submit-aggregate-job.sh RUN_ID`.
+  ```
+  aws stepfunctions start-execution --state-machine-arn $(jq -r .McPricerStack.StateMachineArn stack-outputs.json) --name live-$(date +%Y%m%d-%H%M%S) --input file://config/base.json --profile personal-admin
+  ```
+
+- fixed inputs: `./submit-chained.sh`, which reads `config/repro.json` (or a config file given as the first argument, which must include `S0` and `sigma`)
+
+To see a result, `python3 show_summary.py RUN_ID` prints its `summary.json`. To rerun just the aggregation for an existing run, use `./submit-aggregate-job.sh RUN_ID`.
 
 ## IAM Roles
 
@@ -537,8 +561,10 @@ One root seed spawns a child seed per worker, and each of those spawns one per s
 
 ## Reproducibility
 
-Every random number comes from the root seed, so a run is fully determined by its config. Submitting `config/repro.json` twice gave identical summaries and bit-for-bit identical pnl arrays. This holds for the same root seed and `num_workers`: changing the number of workers changes how the seed tree is split, which gives different (equally valid) results.
+Every random number comes from the root seed, so a run is fully determined by its config. Live runs get new market data each day, so reproducibility checks use `submit-chained.sh` with fixed inputs. Submitting `config/repro.json` twice gave identical summaries and bit-for-bit identical pnl arrays. This holds for the same root seed and `num_workers`: changing the number of workers changes how the seed tree is split, which gives different (equally valid) results.
 
 ## Results
 
-Doing a run with 100,000 scenarios (10,000 scenarios on each worker), and 100,000 inner Monte Carlo iterations, the computed 99% 1-month VaR is 6.7060, and ES is 7.2452. The total number of paths simulated is $10^{10}$.
+The first live run (`live-20261119-212105`) priced an at-the-money 1-year SPY call ($K = 730$) on the 18 Nov 2026 close ($S_0 = 730.20$, $\sigma = 13.8\%$). With 10,000 scenarios and 100,000 inner iterations, the 99% 10-day VaR was 26.55 and ES 29.56, on an option worth 59.60. A call's value only rises with the stock, so the exact VaR is the option repriced with Black-Scholes at the 1% worst stock price, 27.04. The difference is about 1.3 standard errors of a 1% quantile estimated from 10,000 scenarios.
+
+An earlier run with fixed inputs, 100,000 scenarios (10,000 on each worker) and 100,000 inner Monte Carlo iterations gave a 99% 1-month VaR of 6.7060 and ES of 7.2452. The total number of paths simulated is $10^{10}$.
